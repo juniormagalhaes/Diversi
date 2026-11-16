@@ -2,7 +2,10 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <title>Flores das Emoções — Prova de Conceito</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -748,7 +751,23 @@
       }
     }
 
-    @media (max-width: 640px) {
+    @media (max-width: 760px) {
+      header.compact-top-hud {
+        padding: 4px 6px;
+        gap: 4px;
+        overflow-x: auto;
+      }
+      .game-logo span.logo-text {
+        display: none;
+      }
+      .pill {
+        padding: 2px 7px;
+        font-size: 0.75rem;
+      }
+      .hud-btn {
+        padding: 4px 7px;
+        font-size: 0.74rem;
+      }
       .order-strip {
         padding: 4px 6px;
         gap: 4px;
@@ -808,6 +827,9 @@
       <button class="hud-btn" id="btnToggleMusic" onclick="toggleMusic()">
         🎵 Som
       </button>
+      <button class="hud-btn" id="btnFullscreen" onclick="toggleFullScreen()" style="background:#8e44ad; border-color:#d2b4de;" title="Ativar/Sair da Tela Cheia (Full Screen)">
+        ⛶ Tela Cheia
+      </button>
       <button class="hud-btn" onclick="toggleDebugDrawer()" title="Opções de Teste do GDD">
         ⚙️
       </button>
@@ -857,6 +879,9 @@
       </div>
 
       <div class="action-cluster">
+        <button class="btn-float-book" id="btnFloatFullscreen" onclick="toggleFullScreen()" style="background:#8e44ad; border-color:#ebdef0;">
+          ⛶ Tela Cheia
+        </button>
         <button class="btn-float-book" onclick="toggleEncyclopedia()">
           📖 Enciclopédia
         </button>
@@ -3461,6 +3486,53 @@
     function toggleDebugDrawer() {
       document.getElementById('debugDrawer').classList.toggle('active');
     }
+
+    function isDocumentFullscreen() {
+      return !!(document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement);
+    }
+
+    function updateFullscreenButtons() {
+      const isFs = isDocumentFullscreen();
+      const topBtn = document.getElementById('btnFullscreen');
+      const floatBtn = document.getElementById('btnFloatFullscreen');
+      if (topBtn) {
+        topBtn.textContent = isFs ? '🗗 Sair Tela Cheia' : '⛶ Tela Cheia';
+      }
+      if (floatBtn) {
+        floatBtn.textContent = isFs ? '🗗 Sair' : '⛶ Tela Cheia';
+      }
+      setTimeout(setupHiDPICanvas, 80);
+      setTimeout(setupHiDPICanvas, 300);
+    }
+
+    function toggleFullScreen() {
+      ensureAudioContext();
+      const docEl = document.documentElement;
+      if (!isDocumentFullscreen()) {
+        const req = docEl.requestFullscreen || docEl.webkitRequestFullscreen || docEl.msRequestFullscreen;
+        if (req) {
+          Promise.resolve(req.call(docEl)).then(() => {
+            if (screen.orientation && screen.orientation.lock) {
+              screen.orientation.lock('landscape').catch(() => {});
+            }
+            updateFullscreenButtons();
+          }).catch(() => {
+            showToast('💡 Gire o celular na horizontal para melhor visão!', '#8e44ad');
+          });
+        } else {
+          window.scrollTo(0, 1);
+          showToast('💡 No iPhone (Safari), use "Adicionar à Tela de Início" para tela cheia total!', '#8e44ad');
+        }
+      } else {
+        const exit = document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen;
+        if (exit) {
+          Promise.resolve(exit.call(document)).then(updateFullscreenButtons).catch(() => {});
+        }
+      }
+    }
+
+    document.addEventListener('fullscreenchange', updateFullscreenButtons);
+    document.addEventListener('webkitfullscreenchange', updateFullscreenButtons);
 
     function renderEncyclopedia(filterCat = 'ALL') {
       const grid = document.getElementById('encyclopediaCardsGrid');
