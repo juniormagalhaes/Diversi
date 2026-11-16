@@ -1,0 +1,3700 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Flores das Emoções — Prova de Conceito</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <!-- PeerJS para Multiplayer Co-op P2P (WebRTC) entre navegadores -->
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <style>
+    :root {
+      --bg-wood: #6d442b;
+      --bg-wood-dark: #3b2314;
+      --text-main: #3d2b1f;
+      --green-good: #2ecc71;
+      --yellow-warn: #f1c40f;
+      --red-danger: #e74c3c;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none !important;
+      -webkit-user-select: none !important;
+      -moz-user-select: none !important;
+      -ms-user-select: none !important;
+      -webkit-touch-callout: none !important;
+      -webkit-user-drag: none !important;
+      -webkit-tap-highlight-color: transparent !important;
+    }
+
+    .coop-code-input {
+      user-select: text !important;
+      -webkit-user-select: text !important;
+      font-family: 'Fredoka', sans-serif;
+      font-size: 1.15rem;
+      font-weight: 700;
+      text-align: center;
+      letter-spacing: 3px;
+      padding: 8px 12px;
+      border-radius: 10px;
+      border: 2px solid #2980b9;
+      background: #fff;
+      color: #2c3e50;
+      width: 150px;
+      outline: none;
+    }
+
+    html, body {
+      width: 100vw;
+      height: 100dvh;
+      overflow: hidden;
+      font-family: 'Nunito', sans-serif;
+      background-color: #2b1a10;
+      color: var(--text-main);
+      display: flex;
+      flex-direction: column;
+      touch-action: none;
+    }
+
+    h1, h2, h3, h4, .font-display {
+      font-family: 'Fredoka', sans-serif;
+    }
+
+    /* 1. BARRA SUPERIOR ULTRA-COMPACTA (HUD + PEDIDO INTEGRADOS) */
+    header.compact-top-hud {
+      background: linear-gradient(180deg, #5e3a24 0%, #422717 100%);
+      color: #fff;
+      padding: 6px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      border-bottom: 3px solid #2b180d;
+      z-index: 100;
+      flex-shrink: 0;
+    }
+
+    .hud-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: nowrap;
+    }
+
+    .game-logo {
+      font-family: 'Fredoka', sans-serif;
+      font-weight: 700;
+      font-size: 1rem;
+      color: #ffe8d6;
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .pill {
+      background: rgba(0,0,0,0.35);
+      border: 1.5px solid rgba(255,255,255,0.2);
+      padding: 3px 10px;
+      border-radius: 99px;
+      font-weight: 800;
+      font-size: 0.84rem;
+      white-space: nowrap;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .pill.money {
+      background: #27ae60;
+      border-color: #a3e4bd;
+      font-size: 0.92rem;
+    }
+
+    .pill.money.low-money {
+      background: #c0392b;
+      border-color: #f5b7b1;
+      animation: pulseDanger 1s infinite;
+    }
+
+    @keyframes pulseDanger {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.06); }
+    }
+
+    .hud-right {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: nowrap;
+    }
+
+    .hud-btn {
+      font-family: 'Fredoka', sans-serif;
+      border: none;
+      border-radius: 8px;
+      padding: 5px 11px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      white-space: nowrap;
+      color: #fff;
+      background: rgba(255,255,255,0.16);
+      border: 1px solid rgba(255,255,255,0.28);
+    }
+
+    .hud-btn:active {
+      transform: translateY(1px);
+    }
+
+    .hud-btn.btn-book {
+      background: #f39c12;
+      border-color: #f8c471;
+      box-shadow: 0 2px 0 #b9770e;
+    }
+
+    /* 2. FAIXA FLUTUANTE DOS PEDIDOS DOS CLIENTES SIMULTÂNEOS (ATÉ 3 NO BALCÃO) */
+    .order-strip {
+      background: #fff9f2;
+      border-bottom: 3px solid #d4a373;
+      padding: 5px 10px;
+      display: flex;
+      align-items: stretch;
+      justify-content: space-between;
+      gap: 8px;
+      flex-shrink: 0;
+      z-index: 90;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.12);
+    }
+
+    .multi-orders-container {
+      flex: 1;
+      display: flex;
+      align-items: stretch;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .customer-order-card {
+      flex: 1;
+      min-width: 0;
+      background: #ffffff;
+      border: 2px solid #dfc4a6;
+      border-radius: 10px;
+      padding: 4px 8px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 3px;
+      cursor: pointer;
+      transition: border-color 0.15s, transform 0.1s, box-shadow 0.15s;
+    }
+
+    .customer-order-card:hover {
+      border-color: #e67e22;
+    }
+
+    .customer-order-card:active {
+      transform: scale(0.99);
+    }
+
+    .customer-order-card.empty-slot {
+      background: rgba(243, 230, 216, 0.55);
+      border-style: dashed;
+      border-color: #cbb69e;
+      color: #8c6d53;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.78rem;
+      font-weight: 700;
+      cursor: default;
+    }
+
+    .customer-order-card.urgent-slot {
+      border-color: #e74c3c;
+      background: #fff5f5;
+    }
+
+    .order-customer-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 5px;
+      font-size: 0.78rem;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .slot-num-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1px 6px;
+      border-radius: 6px;
+      color: #fff;
+      font-family: 'Fredoka', sans-serif;
+      font-size: 0.72rem;
+      font-weight: 700;
+    }
+
+    .type-badge {
+      font-size: 0.64rem;
+      padding: 1px 5px;
+      border-radius: 99px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+    .type-1 { background: #d4efdf; color: #196f3d; }
+    .type-2 { background: #fcf3cf; color: #7d6608; }
+    .type-3 { background: #ebdef0; color: #633974; }
+
+    .patience-bar-outer {
+      width: 58px;
+      height: 7px;
+      background: #e5d8c8;
+      border-radius: 99px;
+      overflow: hidden;
+      position: relative;
+      border: 1px solid #cbb69e;
+      flex-shrink: 0;
+    }
+
+    .patience-bar-outer::after {
+      content: '';
+      position: absolute;
+      left: 50%;
+      top: 0;
+      bottom: 0;
+      width: 1.5px;
+      background: rgba(0,0,0,0.35);
+      z-index: 2;
+    }
+
+    .patience-bar-inner {
+      height: 100%;
+      width: 100%;
+      background: var(--green-good);
+      transition: width 0.1s linear, background-color 0.3s ease;
+    }
+
+    .order-speech-text {
+      font-size: 0.8rem;
+      line-height: 1.22;
+      color: #3d2b1f;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .order-speech-text strong {
+      color: #c0392b;
+      background: rgba(231, 76, 60, 0.1);
+      padding: 0 3px;
+      border-radius: 4px;
+    }
+
+    .order-speech-text .occasion-highlight {
+      color: #8e44ad;
+      background: rgba(142, 68, 173, 0.12);
+      padding: 0 3px;
+      border-radius: 4px;
+      font-weight: 800;
+    }
+
+    .order-hand-status {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 2px;
+      font-size: 0.76rem;
+      background: #f3e6d8;
+      padding: 4px 9px;
+      border-radius: 8px;
+      white-space: nowrap;
+      flex-shrink: 0;
+      border: 1px solid #dfc4a6;
+    }
+
+    /* 3. PALCO DE GAMEPLAY EM TELA CHEIA (OCUPA TODO O RESTO DA TELA!) */
+    .gameplay-viewport {
+      flex: 1;
+      position: relative;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #2b1a10;
+      overflow: hidden;
+      padding: 4px;
+    }
+
+    #gameCanvas {
+      border-radius: 12px;
+      display: block;
+      cursor: pointer;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.35);
+    }
+
+    /* CONTROLES TOUCH FLUTUANTES SOBRE AS BORDAS DO JOGO (ESTILO ROBLOX MOBILE) */
+    .floating-touch-ui {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      display: none;
+      align-items: flex-end;
+      justify-content: space-between;
+      padding: 12px 16px;
+      z-index: 80;
+    }
+
+    @media (pointer: coarse), (max-width: 920px) {
+      .floating-touch-ui {
+        display: flex;
+      }
+    }
+
+    .dpad-cluster {
+      pointer-events: auto;
+      display: grid;
+      grid-template-columns: repeat(3, 46px);
+      grid-template-rows: repeat(2, 44px);
+      gap: 5px;
+      opacity: 0.85;
+    }
+
+    .dpad-btn {
+      background: rgba(61, 43, 31, 0.82);
+      color: #fff;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-radius: 10px;
+      font-size: 1.2rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      touch-action: none;
+    }
+
+    .dpad-btn:active {
+      background: #f39c12;
+      transform: scale(0.95);
+    }
+
+    .action-cluster {
+      pointer-events: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      align-items: flex-end;
+      opacity: 0.92;
+    }
+
+    .btn-float-action {
+      background: #27ae60;
+      color: #fff;
+      border: 2px solid #a3e4bd;
+      border-radius: 99px;
+      padding: 12px 18px;
+      font-family: 'Fredoka', sans-serif;
+      font-size: 0.95rem;
+      font-weight: 700;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.35);
+      touch-action: manipulation;
+    }
+
+    .btn-float-action:active {
+      transform: scale(0.95);
+    }
+
+    .btn-float-book {
+      background: #f39c12;
+      color: #fff;
+      border: 2px solid #fdebd0;
+      border-radius: 99px;
+      padding: 8px 14px;
+      font-family: 'Fredoka', sans-serif;
+      font-size: 0.82rem;
+      font-weight: 700;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    }
+
+    /* MENU POPUP DE TESTES DO GDD (ESCONDIDO NO BOTÃO ⚙️ PARA NÃO POLUIR A TELA) */
+    .debug-drawer {
+      position: fixed;
+      top: 46px;
+      right: 12px;
+      background: #2c3e50;
+      color: #fff;
+      padding: 10px;
+      border-radius: 12px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+      display: none;
+      flex-direction: column;
+      gap: 6px;
+      z-index: 250;
+      font-size: 0.78rem;
+    }
+
+    .debug-drawer.active {
+      display: flex;
+    }
+
+    .btn-debug {
+      background: #34495e;
+      color: #fff;
+      border: 1px solid #5d6d7e;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 0.76rem;
+      font-weight: 700;
+      cursor: pointer;
+      text-align: left;
+    }
+
+    /* 4. MODAL DA ENCICLOPÉDIA ADAPTADO PARA QUALQUER TELA (CELULAR OU PC) */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(20, 12, 6, 0.78);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 300;
+      padding: 10px;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .encyc-window {
+      background: #fffdf9;
+      border: 4px solid #8c5a3c;
+      border-radius: 18px;
+      width: 96vw;
+      max-width: 860px;
+      max-height: 92dvh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 16px 40px rgba(0,0,0,0.5);
+    }
+
+    .encyc-header {
+      background: linear-gradient(90deg, #6e472b 0%, #4f301d 100%);
+      color: #fff;
+      padding: 8px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+
+    .encyc-order-reminder {
+      background: #fff8e7;
+      border-bottom: 2px solid #e6d0b3;
+      padding: 6px 12px;
+      font-size: 0.82rem;
+      color: #3d2b1f;
+      flex-shrink: 0;
+    }
+
+    .encyc-tabs {
+      display: flex;
+      gap: 6px;
+      padding: 7px 12px;
+      background: #f5ebe0;
+      border-bottom: 2px solid #e6d7c8;
+      overflow-x: auto;
+      flex-shrink: 0;
+    }
+
+    .encyc-tab {
+      border: 1px solid #cbb299;
+      background: #fff;
+      padding: 4px 11px;
+      border-radius: 99px;
+      font-size: 0.78rem;
+      font-weight: 800;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .encyc-tab.active {
+      background: #4f301d;
+      color: #fff;
+      border-color: #4f301d;
+    }
+
+    .encyc-cards-grid {
+      padding: 10px 12px;
+      overflow-y: auto;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 8px;
+    }
+
+    .encyc-card {
+      background: #fff;
+      border: 2px solid #ead8c3;
+      border-radius: 12px;
+      padding: 8px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .encyc-card-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+    }
+
+    .occ-tag {
+      display: inline-block;
+      background: #f3e8ff;
+      color: #5b21b6;
+      padding: 2px 6px;
+      border-radius: 5px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      margin: 1px 2px 1px 0;
+    }
+
+    .btn-close-red {
+      background: #e74c3c;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 5px 12px;
+      font-family: 'Fredoka', sans-serif;
+      font-size: 0.84rem;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    /* 5. SLIDES DE "COMO JOGAR" NO INÍCIO */
+    .tutorial-card {
+      background: #fffdf9;
+      border: 4px solid #8c5a3c;
+      border-radius: 20px;
+      width: 94vw;
+      max-width: 540px;
+      max-height: 92dvh;
+      padding: 18px 20px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 12px;
+      text-align: center;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.55);
+      overflow-y: auto;
+    }
+
+    .slide-badge {
+      display: inline-block;
+      background: #fdebd0;
+      color: #9c640c;
+      font-weight: 800;
+      font-size: 0.75rem;
+      padding: 3px 10px;
+      border-radius: 99px;
+      margin-bottom: 4px;
+    }
+
+    .slide-icon {
+      font-size: 2.8rem;
+      line-height: 1.1;
+    }
+
+    .slide-title {
+      font-size: 1.35rem;
+      color: #4f301d;
+    }
+
+    .slide-body {
+      font-size: 0.92rem;
+      line-height: 1.45;
+      color: #4a3525;
+      background: #f7efe6;
+      border-radius: 12px;
+      padding: 12px 14px;
+      text-align: left;
+    }
+
+    .slide-dots {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .slide-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #d5c3b0;
+      transition: all 0.2s;
+    }
+
+    .slide-dot.active {
+      width: 24px;
+      border-radius: 99px;
+      background: #e67e22;
+    }
+
+    .slide-nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .btn-slide {
+      font-family: 'Fredoka', sans-serif;
+      border: none;
+      border-radius: 10px;
+      padding: 9px 16px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .btn-slide-prev {
+      background: #e6d7c8;
+      color: #4f301d;
+    }
+
+    .btn-slide-next {
+      background: #27ae60;
+      color: #fff;
+      flex: 1;
+      box-shadow: 0 3px 0 #196f3d;
+    }
+
+    /* TOAST DE FEEDBACK */
+    .feedback-overlay {
+      position: fixed;
+      top: 96px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 260;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .toast-msg {
+      padding: 8px 16px;
+      border-radius: 10px;
+      font-family: 'Fredoka', sans-serif;
+      font-size: 0.95rem;
+      color: #fff;
+      box-shadow: 0 6px 16px rgba(0,0,0,0.3);
+      animation: popToast 2.1s forwards;
+    }
+
+    @keyframes popToast {
+      0% { opacity: 0; transform: translateY(10px) scale(0.92); }
+      12% { opacity: 1; transform: translateY(0) scale(1); }
+      82% { opacity: 1; transform: translateY(0); }
+      100% { opacity: 0; transform: translateY(-14px); }
+    }
+
+    /* RESPONSIVIDADE EXTRA PARA CELULAR DEITADO (LANDSCAPE BAIXO) */
+    @media (max-height: 500px) {
+      header.compact-top-hud {
+        padding: 3px 8px;
+      }
+      .game-logo span.logo-text {
+        display: none;
+      }
+      .order-strip {
+        padding: 3px 8px;
+        gap: 8px;
+      }
+      .order-speech-text {
+        font-size: 0.8rem;
+        padding: 3px 8px;
+      }
+      .order-hand-status {
+        font-size: 0.72rem;
+        padding: 3px 7px;
+      }
+      .tutorial-card {
+        padding: 10px 14px;
+        gap: 6px;
+      }
+      .slide-icon {
+        font-size: 1.8rem;
+      }
+      .slide-title {
+        font-size: 1.1rem;
+      }
+      .slide-body {
+        font-size: 0.82rem;
+        padding: 8px 10px;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .order-strip {
+        padding: 4px 6px;
+        gap: 4px;
+      }
+      .multi-orders-container {
+        gap: 4px;
+      }
+      .customer-order-card {
+        padding: 3px 6px;
+      }
+      .order-speech-text {
+        font-size: 0.72rem;
+      }
+      .order-hand-status {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 1. TOP HUD COMPACTO -->
+  <header class="compact-top-hud">
+    <div class="hud-left">
+      <div class="game-logo">
+        <span>🌸</span>
+        <span class="logo-text">Flores das Emoções</span>
+      </div>
+      <div class="pill money" id="moneyPill">
+        <span>💰</span>
+        <span id="hudMoney">$100</span>
+      </div>
+      <div class="pill">
+        <span>📅 Dia</span>
+        <span id="hudDay">1</span>
+      </div>
+      <div class="pill">
+        <span>🧑‍🤝‍🧑</span>
+        <span id="hudCustomers">0/6</span>
+      </div>
+      <div class="pill">
+        <span>🔥</span>
+        <span id="hudScore">0</span>
+      </div>
+    </div>
+
+    <div class="hud-right">
+      <button class="hud-btn" id="btnToggleCoop" onclick="openCoopModal()" style="background:#2980b9; border-color:#85c1e9;" title="Jogar Co-op Online P2P (PeerJS) ou com Bot IA">
+        🌐 Co-op / Sala
+      </button>
+      <button class="hud-btn btn-book" onclick="toggleEncyclopedia()">
+        📖 Enciclopédia
+      </button>
+      <button class="hud-btn" onclick="openTutorialSlides()">
+        ❓ Como Jogar
+      </button>
+      <button class="hud-btn" id="btnToggleMusic" onclick="toggleMusic()">
+        🎵 Som
+      </button>
+      <button class="hud-btn" onclick="toggleDebugDrawer()" title="Opções de Teste do GDD">
+        ⚙️
+      </button>
+    </div>
+  </header>
+
+  <!-- MENU COMPACTO DE TESTES DO GDD (ABERTO NO BOTÃO ⚙️) -->
+  <div class="debug-drawer" id="debugDrawer">
+    <strong style="color:#f39c12;">🛠️ Testes Rápidos do GDD:</strong>
+    <button class="btn-debug" onclick="forceCustomerType(1)">🎯 +Cliente Tipo 1 (Decidido)</button>
+    <button class="btn-debug" onclick="forceCustomerType(2)">💭 +Cliente Tipo 2 (Indeciso)</button>
+    <button class="btn-debug" onclick="forceCustomerType(3)">✨ +Cliente Tipo 3 (Misto)</button>
+    <button class="btn-debug" onclick="fillAllThreeSlots()" style="background:#1f618d;">👥 Lotar Balcão (3 Clientes)</button>
+    <button class="btn-debug" onclick="adjustMoney(-50)" style="background:#922b21;">💸 Testar Prejuízo (-$50)</button>
+    <button class="btn-debug" onclick="togglePauseTimer()" id="btnPauseTimer">⏸️ Pausar Tempo</button>
+    <button class="btn-debug" onclick="resetGame()">🔄 Reiniciar Partida</button>
+  </div>
+
+  <!-- 2. FAIXA COMPACTA DOS PEDIDOS SIMULTÂNEOS (ATÉ 3 CLIENTES NO BALCÃO) -->
+  <div class="order-strip">
+    <div class="multi-orders-container" id="multiOrdersContainer">
+      <!-- Preenchido dinamicamente com os cards dos clientes #1, #2 e #3 -->
+    </div>
+
+    <div class="order-hand-status">
+      <div>✋ Mão: <strong id="hudHandItem" style="color:#8c5a3c;">Vazia</strong></div>
+      <div>💐 Mesa: <strong id="hudTableBouquet" style="color:#196f3d;">0/2</strong></div>
+    </div>
+  </div>
+
+  <!-- FLOATING TOAST OVERLAY -->
+  <div class="feedback-overlay" id="feedbackOverlay"></div>
+
+  <!-- 3. PALCO PRINCIPAL: APENAS A GAMEPLAY EM TELA CHEIA -->
+  <div class="gameplay-viewport">
+    <canvas id="gameCanvas" width="960" height="480"></canvas>
+
+    <!-- CONTROLES TOUCH FLUTUANTES NAS BORDAS (PARA CELULAR) -->
+    <div class="floating-touch-ui">
+      <div class="dpad-cluster">
+        <div></div>
+        <button class="dpad-btn" onpointerdown="setMobileKey('w', true, event)" onpointerup="setMobileKey('w', false, event)" onpointerleave="setMobileKey('w', false, event)" onpointercancel="setMobileKey('w', false, event)">⬆️</button>
+        <div></div>
+        <button class="dpad-btn" onpointerdown="setMobileKey('a', true, event)" onpointerup="setMobileKey('a', false, event)" onpointerleave="setMobileKey('a', false, event)" onpointercancel="setMobileKey('a', false, event)">⬅️</button>
+        <button class="dpad-btn" onpointerdown="setMobileKey('s', true, event)" onpointerup="setMobileKey('s', false, event)" onpointerleave="setMobileKey('s', false, event)" onpointercancel="setMobileKey('s', false, event)">⬇️</button>
+        <button class="dpad-btn" onpointerdown="setMobileKey('d', true, event)" onpointerup="setMobileKey('d', false, event)" onpointerleave="setMobileKey('d', false, event)" onpointercancel="setMobileKey('d', false, event)">➡️</button>
+      </div>
+
+      <div class="action-cluster">
+        <button class="btn-float-book" onclick="toggleEncyclopedia()">
+          📖 Enciclopédia
+        </button>
+        <button class="btn-float-action" onclick="triggerPlayerInteraction()">
+          ✋ INTERAGIR
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. MODAL DA ENCICLOPÉDIA ADAPTADO (EM CARDS RESPONSIVOS) -->
+  <div class="modal-overlay" id="encycModal">
+    <div class="encyc-window">
+      <div class="encyc-header">
+        <div>
+          <h3 style="font-size:1.05rem;">📖 Enciclopédia das Flores e Ocasiões</h3>
+        </div>
+        <button class="btn-close-red" onclick="toggleEncyclopedia()">✕ Fechar</button>
+      </div>
+
+      <!-- Lembrete do pedido atual dentro da Enciclopédia para não precisar fechar para ler -->
+      <div class="encyc-order-reminder" id="encycOrderReminder">
+        💬 <strong>Pedido Atual:</strong> ...
+      </div>
+
+      <div class="encyc-tabs">
+        <button class="encyc-tab active" onclick="filterEncyclopedia('ALL', this)">📚 Todas (10)</button>
+        <button class="encyc-tab" onclick="filterEncyclopedia('VERMELHA', this)">❤️ Vermelhas (Amor)</button>
+        <button class="encyc-tab" onclick="filterEncyclopedia('DOURADA', this)">💛 Douradas (Alegria/15 Anos)</button>
+        <button class="encyc-tab" onclick="filterEncyclopedia('AZUL', this)">💙 Azuis (Calma/Consolo)</button>
+        <button class="encyc-tab" onclick="filterEncyclopedia('BRANCA', this)">🤍 Brancas (Luto/Paz)</button>
+        <button class="encyc-tab" onclick="filterEncyclopedia('VERDE', this)">💚 Verdes (Recomeço)</button>
+      </div>
+
+      <div class="encyc-cards-grid" id="encyclopediaCardsGrid"></div>
+    </div>
+  </div>
+
+  <!-- 5. SLIDES DE "COMO JOGAR" NO INÍCIO -->
+  <div class="modal-overlay active" id="tutorialModal">
+    <div class="tutorial-card">
+      <div>
+        <span class="slide-badge" id="slideStepBadge">COMO JOGAR • SLIDE 1 DE 4</span>
+        <div class="slide-icon" id="slideIcon">🌸</div>
+        <h2 class="slide-title" id="slideTitle">Bem-vindo à Floricultura!</h2>
+      </div>
+
+      <div class="slide-body" id="slideBody"></div>
+
+      <div class="slide-dots" id="slideDots"></div>
+
+      <div class="slide-nav">
+        <button class="btn-slide btn-slide-prev" id="btnSlidePrev" onclick="changeTutorialSlide(-1)">
+          ⬅️ Anterior
+        </button>
+        <button class="btn-slide btn-slide-next" id="btnSlideNext" onclick="changeTutorialSlide(1)">
+          Próximo ➡️
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 6. MODAL DE FIM DE DIA / FALÊNCIA -->
+  <div class="modal-overlay" id="gameModal">
+    <div class="tutorial-card">
+      <div class="slide-icon" id="modalIcon">🌻</div>
+      <h2 class="slide-title" id="modalTitle">Fim do Dia!</h2>
+      <p id="modalDesc" style="font-size:0.88rem; color:#6e472b;"></p>
+      <div class="slide-body" id="modalStats"></div>
+      <button class="btn-slide btn-slide-next" id="modalBtn" onclick="handleModalAction()">
+        ▶️ Continuar
+      </button>
+    </div>
+  </div>
+
+  <!-- 7. MODAL DE MULTIPLAYER CO-OP (PEERJS P2P ENTRE NAVEGADORES + BOT IA) -->
+  <div class="modal-overlay" id="coopModal">
+    <div class="tutorial-card" style="max-width: 520px;">
+      <div style="display:flex; width:100%; justify-content:space-between; align-items:center;">
+        <span class="slide-badge" style="background:#d6eaf8; color:#1b4f72;">MULTIPLAYER CO-OP (1 A 4 JOGADORES)</span>
+        <button class="btn-close-red" onclick="closeCoopModal()">✕ Fechar</button>
+      </div>
+
+      <h2 class="slide-title" style="font-size:1.25rem;">🌐 Sala Co-op (PeerJS P2P & Bot)</h2>
+
+      <div class="slide-body" style="display:flex; flex-direction:column; gap:10px;">
+        <!-- SEÇÃO 1: P2P ENTRE NAVEGADORES VIA PEERJS -->
+        <div style="background:#f4f9fd; border:1.5px solid #aed6f1; border-radius:10px; padding:10px;">
+          <div style="font-weight:800; color:#1b4f72; margin-bottom:4px; font-size:0.9rem;">
+            🌐 Co-op Online entre Navegadores (PeerJS P2P)
+          </div>
+          <p style="font-size:0.78rem; color:#555; margin-bottom:8px;">
+            Abra o jogo em 2 abas/navegadores (ou PC + Celular). Um jogador cria a sala e passa o código de 4 dígitos para os amigos entrarem!
+          </p>
+
+          <div id="p2pControlsBox" style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:space-between;">
+            <button class="btn-slide btn-slide-next" onclick="createPeerRoom()" style="background:#2980b9; font-size:0.84rem; padding:8px 12px;">
+              ➕ Criar Sala (Host P1)
+            </button>
+
+            <div style="display:flex; gap:6px; align-items:center;">
+              <input type="text" id="joinRoomCodeInput" class="coop-code-input" maxlength="6" placeholder="CÓDIGO" />
+              <button class="btn-slide btn-slide-next" onclick="joinPeerRoom()" style="font-size:0.84rem; padding:8px 12px;">
+                🔗 Entrar
+              </button>
+            </div>
+          </div>
+
+          <!-- Painel exibido quando a sala P2P está ativa -->
+          <div id="p2pActiveRoomBox" style="display:none; margin-top:8px; background:#fff; border:1.5px dashed #2980b9; border-radius:8px; padding:8px; text-align:center;">
+            <div style="font-size:0.78rem; font-weight:800; color:#1b4f72;">CÓDIGO DA SALA P2P:</div>
+            <div style="display:flex; align-items:center; justify-content:center; gap:8px; margin:4px 0;">
+              <span id="displayRoomCode" style="font-family:'Fredoka',sans-serif; font-size:1.6rem; font-weight:700; color:#e67e22; letter-spacing:4px;">----</span>
+              <button class="btn-slide btn-slide-prev" onclick="copyRoomCode()" style="padding:4px 9px; font-size:0.76rem;">📋 Copiar</button>
+            </div>
+            <div id="p2pStatusText" style="font-size:0.78rem; font-weight:700; color:#27ae60; margin-bottom:6px;">
+              🟢 Aguardando amigos...
+            </div>
+            <button class="btn-close-red" onclick="disconnectPeerRoom()" style="font-size:0.76rem; padding:4px 10px;">
+              🔌 Desconectar Sala P2P
+            </button>
+          </div>
+        </div>
+
+        <!-- SEÇÃO 2: PARCEIRO BOT IA (OFFLINE) -->
+        <div style="background:#fef9e7; border:1.5px solid #f9e79f; border-radius:10px; padding:10px; display:flex; align-items:center; justify-content:space-between; gap:10px;">
+          <div>
+            <div style="font-weight:800; color:#7d6608; font-size:0.88rem;">🤖 Parceiro Bot IA (Co-op Local)</div>
+            <div style="font-size:0.75rem; color:#666;">Adiciona um florista controlado por IA que busca as flores que você marcar na Enciclopédia!</div>
+          </div>
+          <button class="btn-slide" id="btnModalBotToggle" onclick="toggleCoopMode()" style="background:#f39c12; color:#fff; font-size:0.82rem; padding:8px 12px; white-space:nowrap;">
+            🤖 Bot IA: OFF
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /**************************************************************
+     * 1. SLIDES DE "COMO JOGAR" (TUTORIAL INICIAL)
+     **************************************************************/
+    const TUTORIAL_SLIDES = [
+      {
+        icon: '🌸👩‍🌾',
+        title: 'Bem-vindo à Floricultura!',
+        body: `
+          <p style="margin-bottom:8px;">Você trabalha no balcão da floricultura da família em Holambra! Aqui cada flor carrega um <strong>sentimento</strong> e combina com uma <strong>ocasião da vida</strong>.</p>
+          <p><strong>🎮 Como se mover e agir:</strong></p>
+          <ul style="padding-left:18px; margin-top:4px;">
+            <li><strong>No Celular:</strong> Toque direto em cima dos vasos/balcão (o boneco anda e interage sozinho!) ou use os botões nas bordas da tela.</li>
+            <li><strong>No PC:</strong> Ande com <strong>WASD / Setas</strong> e interaja com <strong>ESPAÇO / E</strong> (ou clique com o mouse).</li>
+          </ul>
+        `
+      },
+      {
+        icon: '🧑‍🤝‍🧑💬',
+        title: 'Clientes Simultâneos e 3 Tipos de Pedido',
+        body: `
+          <p style="margin-bottom:6px;">Até <strong>2 clientes (Dia 1)</strong> ou <strong>3 clientes (Dia 2+)</strong> esperam lado a lado no balcão (<strong>#1, #2 e #3</strong>):</p>
+          <ul style="padding-left:18px; display:flex; flex-direction:column; gap:5px;">
+            <li>🎯 <strong>Tipo 1 (Decidido):</strong> Pede 1 ou 2 flores pelo nome exato.</li>
+            <li>💭 <strong>Tipo 2 (Indeciso):</strong> Conta a ocasião (ex: <em>"Casamento"</em>, <em>"Velório"</em>) e você escolhe a flor certa.</li>
+            <li>✨ <strong>Tipo 3 (Misto):</strong> Pede <strong>1 flor exata</strong> + <strong>1 recomendação</strong> para uma ocasião!</li>
+          </ul>
+        `
+      },
+      {
+        icon: '📖💐',
+        title: 'Montagem e Entrega no Cliente Escolhido',
+        body: `
+          <ul style="padding-left:18px; display:flex; flex-direction:column; gap:6px;">
+            <li>📖 <strong>Enciclopédia:</strong> Consulte qual flor/cor atende a cada ocasião (os pedidos de todos os clientes aparecem no topo!).</li>
+            <li>🔔 <strong>Pedido de 1 Flor:</strong> Pegue a flor no vaso e leve direto até a frente do <strong>Cliente (#1, #2 ou #3)</strong> no balcão!</li>
+            <li>💐 <strong>Pedido de 2 Flores:</strong> Junte as 2 flores na <strong>💐 Mesa de Montagem</strong> primeiro e depois entregue na frente do <strong>Cliente (#1, #2 ou #3)</strong> que pediu!</li>
+          </ul>
+        `
+      },
+      {
+        icon: '⏳💰',
+        title: 'Paciência, Gorjetas e Falência',
+        body: `
+          <ul style="padding-left:18px; display:flex; flex-direction:column; gap:6px;">
+            <li>🟢 <strong>Fase Verde (Rápido):</strong> Entregar enquanto a barra está na metade verde dá <strong>+$10 de Gorjeta</strong>!</li>
+            <li>🟡 <strong>Fase Amarela:</strong> Tempo tranquilo para consultar a Enciclopédia (valor normal).</li>
+            <li>💸 <strong>Cuidado com a Falência:</strong> Errar as flores (<strong>-$30</strong>) ou deixar o cliente ir embora (<strong>-$15</strong>) desconta do caixa. Se chegar a <strong>$0</strong>, é <strong>Game Over</strong>!</li>
+          </ul>
+        `
+      }
+    ];
+
+    let currentSlideIdx = 0;
+
+    function renderTutorialSlide() {
+      const s = TUTORIAL_SLIDES[currentSlideIdx];
+      document.getElementById('slideStepBadge').textContent = `COMO JOGAR • SLIDE ${currentSlideIdx + 1} DE ${TUTORIAL_SLIDES.length}`;
+      document.getElementById('slideIcon').textContent = s.icon;
+      document.getElementById('slideTitle').textContent = s.title;
+      document.getElementById('slideBody').innerHTML = s.body;
+
+      const dotsContainer = document.getElementById('slideDots');
+      dotsContainer.innerHTML = TUTORIAL_SLIDES.map((_, i) =>
+        `<div class="slide-dot ${i === currentSlideIdx ? 'active' : ''}"></div>`
+      ).join('');
+
+      const prevBtn = document.getElementById('btnSlidePrev');
+      const nextBtn = document.getElementById('btnSlideNext');
+      prevBtn.style.visibility = currentSlideIdx === 0 ? 'hidden' : 'visible';
+
+      if (currentSlideIdx === TUTORIAL_SLIDES.length - 1) {
+        nextBtn.textContent = '▶️ Começar a Jogar!';
+      } else {
+        nextBtn.textContent = 'Próximo ➡️';
+      }
+    }
+
+    function changeTutorialSlide(delta) {
+      ensureAudioContext();
+      if (currentSlideIdx + delta >= TUTORIAL_SLIDES.length) {
+        // Fecha o tutorial e inicia/retoma o jogo
+        document.getElementById('tutorialModal').classList.remove('active');
+        state.tutorialOpen = false;
+        return;
+      }
+      currentSlideIdx = Math.max(0, currentSlideIdx + delta);
+      renderTutorialSlide();
+    }
+
+    function openTutorialSlides() {
+      currentSlideIdx = 0;
+      state.tutorialOpen = true;
+      renderTutorialSlide();
+      document.getElementById('tutorialModal').classList.add('active');
+    }
+
+    /**************************************************************
+     * 2. DADOS DO GDD: CATEGORIAS, FLORES E ESTAÇÕES NO MAPA
+     **************************************************************/
+    const CATEGORIES = {
+      VERMELHA: {
+        id: 'VERMELHA',
+        name: 'Vermelha',
+        hex: '#e74c3c',
+        bgSoft: '#fadbd8',
+        textCol: '#922b21',
+        sentiment: 'Amor, Paixão, Carinho e União',
+        occasions: [
+          'Casamento (Buquê de Noiva)',
+          'Dia dos Namorados',
+          'Aniversário de Namoro / Bodas',
+          'Pedido de Namoro / Declaração'
+        ]
+      },
+      DOURADA: {
+        id: 'DOURADA',
+        name: 'Dourada / Amarela',
+        hex: '#f1c40f',
+        bgSoft: '#fcf3cf',
+        textCol: '#7d6608',
+        sentiment: 'Alegria, Celebração, Entusiasmo e Gratidão',
+        occasions: [
+          'Festa de 15 Anos',
+          'Festa de Aniversário Feliz',
+          'Formatura da Escola/Faculdade',
+          'Promoção no Trabalho',
+          'Agradecimento a um Amigo'
+        ]
+      },
+      AZUL: {
+        id: 'AZUL',
+        name: 'Azul / Violeta',
+        hex: '#5dade2',
+        bgSoft: '#d6eaf8',
+        textCol: '#1b4f72',
+        sentiment: 'Consolo na Tristeza, Calma, Serenidade e Desculpas',
+        occasions: [
+          'Consolar Amigo Triste',
+          'Pedido de Desculpas Sincero',
+          'Pessoa Estressada / Precisando de Calma',
+          'Saudade de quem mudou de cidade'
+        ]
+      },
+      BRANCA: {
+        id: 'BRANCA',
+        name: 'Branca',
+        hex: '#ecf0f1',
+        bgSoft: '#eaeded',
+        textCol: '#424949',
+        sentiment: 'Luto, Despedida, Memória, Paz e Respeito',
+        occasions: [
+          'Velório / Homenagem Póstuma',
+          'Memorial de Família',
+          'Despedida Definitiva',
+          'Desejar Paz Interior'
+        ]
+      },
+      VERDE: {
+        id: 'VERDE',
+        name: 'Verde / Esperança',
+        hex: '#2ecc71',
+        bgSoft: '#d5f5e3',
+        textCol: '#186a3b',
+        sentiment: 'Esperança, Renovação, Coragem e Recomeço',
+        occasions: [
+          'Nascimento de um Bebê',
+          'Mudança para Casa Nova',
+          'Primeiro Dia em Novo Emprego',
+          'Visita no Hospital (Desejar Melhoras)'
+        ]
+      }
+    };
+
+    const FLOWERS = [
+      { id: 'rosa_vermelha', name: 'Rosa Vermelha', emoji: '🌹', category: 'VERMELHA', x: 205, y: 48 },
+      { id: 'tulipa_carmim', name: 'Tulipa Carmim', emoji: '🌷', category: 'VERMELHA', x: 388, y: 48 },
+      { id: 'girassol', name: 'Girassol', emoji: '🌻', category: 'DOURADA', x: 572, y: 48 },
+      { id: 'gerbera_dourada', name: 'Gérbera Dourada', emoji: '🌼', category: 'DOURADA', x: 755, y: 48 },
+
+      { id: 'hortensia_azul', name: 'Hortênsia Azul', emoji: '💠', category: 'AZUL', x: 74, y: 118 },
+      { id: 'lavanda_azul', name: 'Lavanda Azul', emoji: '🪻', category: 'AZUL', x: 74, y: 198 },
+      { id: 'lirio_branco', name: 'Lírio Branco', emoji: '🤍', category: 'BRANCA', x: 74, y: 278 },
+
+      { id: 'crisantemo_branco', name: 'Crisântemo Branco', emoji: '💮', category: 'BRANCA', x: 886, y: 118 },
+      { id: 'orquidea_verde', name: 'Orquídea Verde', emoji: '🌿', category: 'VERDE', x: 886, y: 198 },
+      { id: 'cravo_esperanca', name: 'Cravo da Esperança', emoji: '🌱', category: 'VERDE', x: 886, y: 278 }
+    ];
+
+    const COUNTER_STATIONS = [
+      { id: 'STATION_TRASH', type: 'TRASH', name: 'Lixeira', emoji: '🗑️', x: 186, y: 336 },
+      { id: 'STATION_BOUQUET', type: 'BOUQUET_TABLE', name: 'Mesa de Montagem', emoji: '💐', x: 320, y: 336 },
+      { id: 'STATION_CUST_0', type: 'CUSTOMER_SLOT', slotIndex: 0, name: 'Cliente #1', emoji: '🔔', x: 468, y: 336 },
+      { id: 'STATION_CUST_1', type: 'CUSTOMER_SLOT', slotIndex: 1, name: 'Cliente #2', emoji: '🔔', x: 612, y: 336 },
+      { id: 'STATION_CUST_2', type: 'CUSTOMER_SLOT', slotIndex: 2, name: 'Cliente #3', emoji: '🔔', x: 756, y: 336 }
+    ];
+
+    const CUSTOMER_NAMES = [
+      'Dona Clara', 'Sr. Otávio', 'Lucas', 'Marina', 'Tia Helena',
+      'Pedro', 'Sofia', 'Seu Joaquim', 'Beatriz', 'Gabriel', 'Camila'
+    ];
+    const CUSTOMER_COLORS = ['#e74c3c', '#2980b9', '#8e44ad', '#d35400', '#16a085', '#c0392b', '#27ae60'];
+
+    /**************************************************************
+     * 3. ESTADO DO JOGO (MÚLTIPLOS CLIENTES SIMULTÂNEOS)
+     **************************************************************/
+    const keysPressed = {};
+
+    function createEmptySlot(slotIndex, xPos) {
+      return {
+        slotIndex,
+        x: xPos,
+        y: 478,
+        targetY: 400,
+        state: 'EMPTY', // 'EMPTY' | 'ENTERING' | 'WAITING' | 'LEAVING_HAPPY' | 'LEAVING_ANGRY'
+        spawnCooldown: 0,
+        order: null,
+        patienceMax: 60,
+        patienceLeft: 60,
+        reactionEmoji: ''
+      };
+    }
+
+    let state = {
+      money: 100,
+      day: 1,
+      customersSpawnedInDay: 0,
+      customersServedInDay: 0,
+      customersPerDay: 6,
+      forceThreeSlots: false,
+      totalHits: 0,
+      dayHits: 0,
+      dayErrors: 0,
+      dayWalkouts: 0,
+      dayTips: 0,
+      timerPaused: false,
+      tutorialOpen: true,
+      gameActive: true,
+      forcedNextType: null,
+      tableBouquet: [],
+      pingedFlowerId: null,
+      coopEnabled: false,
+
+      player: {
+        x: 480,
+        y: 220,
+        radius: 20,
+        speed: 255,
+        heldFlower: null,
+        targetX: null,
+        targetY: null,
+        facingAngle: Math.PI / 2,
+        autoInteractOnArrive: false
+      },
+
+      coopPartner: {
+        x: 360,
+        y: 220,
+        radius: 20,
+        speed: 205,
+        heldFlower: null,
+        facingAngle: Math.PI / 2,
+        aiTimer: 0.8,
+        task: null // { step: 'PICK' | 'PLACE_TABLE' | 'DELIVER', flower: obj, slotIndex: num }
+      },
+
+      nearbyInteractable: null,
+
+      customerSlots: [
+        createEmptySlot(0, 468),
+        createEmptySlot(1, 612),
+        createEmptySlot(2, 756)
+      ]
+    };
+
+    function getMaxSimultaneousSlots() {
+      if (netState.mode !== 'OFFLINE' || state.coopEnabled || state.forceThreeSlots || state.day >= 2) return 3;
+      return 2; // Dia 1 Solo começa com até 2 clientes simultâneos; Dia 2+ ou Modo Co-op libera até 3!
+    }
+
+    /**************************************************************
+     * 3B. REDE P2P WEBRTC (PEERJS ENTRE NAVEGADORES — 1 A 4 JOGADORES)
+     **************************************************************/
+    const PEER_COLORS = ['#27ae60', '#2980b9', '#8e44ad', '#e67e22'];
+    const netState = {
+      mode: 'OFFLINE', // 'OFFLINE' | 'HOST' | 'CLIENT'
+      roomCode: '',
+      peer: null,
+      hostConn: null,
+      clients: [], // Usado pelo HOST: [{ conn, label, color, x, y, facingAngle, heldFlower }]
+      remotePlayers: [], // Usado para desenhar os outros jogadores da sala P2P
+      myLabel: 'VOCÊ (P1)',
+      myColor: '#27ae60',
+      syncAccum: 0
+    };
+
+    function openCoopModal() {
+      document.getElementById('coopModal').classList.add('active');
+    }
+
+    function closeCoopModal() {
+      document.getElementById('coopModal').classList.remove('active');
+    }
+
+    function updateCoopTopButton() {
+      const btn = document.getElementById('btnToggleCoop');
+      const botBtn = document.getElementById('btnModalBotToggle');
+      if (botBtn) {
+        botBtn.textContent = state.coopEnabled ? '🤖 Bot IA: ON' : '🤖 Bot IA: OFF';
+        botBtn.style.background = state.coopEnabled ? '#27ae60' : '#f39c12';
+      }
+
+      if (netState.mode === 'HOST') {
+        const totalP = 1 + netState.clients.length;
+        btn.textContent = `🌐 Sala ${netState.roomCode} (${totalP}P)`;
+        btn.style.background = '#27ae60';
+      } else if (netState.mode === 'CLIENT') {
+        btn.textContent = `🌐 Conectado (${netState.myLabel})`;
+        btn.style.background = '#27ae60';
+      } else if (state.coopEnabled) {
+        btn.textContent = '🤖 Co-op Bot: ON';
+        btn.style.background = '#27ae60';
+      } else {
+        btn.textContent = '🌐 Co-op / Sala';
+        btn.style.background = '#2980b9';
+      }
+    }
+
+    function copyRoomCode() {
+      if (!netState.roomCode) return;
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(netState.roomCode).catch(() => {});
+      }
+      showToast(`📋 Código ${netState.roomCode} copiado!`, '#2980b9');
+    }
+
+    function createPeerRoom() {
+      if (typeof Peer === 'undefined') {
+        showToast('⚠️ Biblioteca PeerJS ainda carregando, tente novamente!', '#e67e22');
+        return;
+      }
+      disconnectPeerRoom(true);
+
+      const code = String(Math.floor(1000 + Math.random() * 9000));
+      const peerId = `flores-emocoes-room-${code}`;
+
+      document.getElementById('p2pControlsBox').style.display = 'none';
+      document.getElementById('p2pActiveRoomBox').style.display = 'block';
+      document.getElementById('displayRoomCode').textContent = code;
+      document.getElementById('p2pStatusText').textContent = '⏳ Abrindo sala P2P no servidor PeerJS...';
+
+      const peer = new Peer(peerId);
+      netState.peer = peer;
+      netState.roomCode = code;
+      netState.mode = 'HOST';
+      netState.myLabel = 'VOCÊ (P1)';
+      netState.myColor = PEER_COLORS[0];
+
+      peer.on('open', () => {
+        document.getElementById('p2pStatusText').textContent = '🟢 Sala P2P Aberta! Jogadores na loja: 1/4';
+        showToast(`🌐 Sala ${code} criada! Passe o código para seu amigo!`, '#27ae60');
+        updateCoopTopButton();
+        updateOrderBannerUI();
+      });
+
+      peer.on('connection', (conn) => {
+        if (netState.clients.length >= 3) {
+          conn.on('open', () => conn.send({ type: 'FULL' }));
+          return;
+        }
+        const pNum = netState.clients.length + 2; // P2, P3, P4
+        const clientObj = {
+          conn,
+          label: `P${pNum}`,
+          color: PEER_COLORS[(pNum - 1) % PEER_COLORS.length],
+          x: 340 + (pNum - 2) * 70,
+          y: 220,
+          facingAngle: Math.PI / 2,
+          heldFlower: null
+        };
+        netState.clients.push(clientObj);
+
+        conn.on('open', () => {
+          conn.send({
+            type: 'WELCOME',
+            label: clientObj.label,
+            color: clientObj.color,
+            roomCode: netState.roomCode,
+            startX: clientObj.x,
+            startY: clientObj.y
+          });
+          // Se a 3ª posição do balcão estava vazia, ativa cliente para ela
+          if (state.customerSlots[2].state === 'EMPTY' && state.customersSpawnedInDay < state.customersPerDay) {
+            state.customerSlots[2].spawnCooldown = 1.0;
+          }
+          broadcastHostState();
+          document.getElementById('p2pStatusText').textContent =
+            `🟢 Sala Ativa! Jogadores conectados: ${1 + netState.clients.length}/4`;
+          showToast(`🤝 Jogador ${clientObj.label} entrou na floricultura!`, '#27ae60');
+          updateCoopTopButton();
+          updateOrderBannerUI();
+        });
+
+        conn.on('data', (msg) => {
+          if (!msg || typeof msg !== 'object') return;
+          if (msg.type === 'MOVE') {
+            clientObj.x = msg.x;
+            clientObj.y = msg.y;
+            clientObj.facingAngle = msg.facingAngle;
+          } else if (msg.type === 'INTERACT') {
+            handleRemoteClientInteract(clientObj, msg.target);
+          } else if (msg.type === 'PING') {
+            state.pingedFlowerId = msg.flowerId;
+            const fl = FLOWERS.find(f => f.id === msg.flowerId);
+            if (fl) {
+              broadcastToast(`📌 ${clientObj.label} marcou ${fl.name} no mapa!`, '#2980b9', 'pick');
+            }
+            broadcastHostState();
+          }
+        });
+
+        conn.on('close', () => {
+          netState.clients = netState.clients.filter(c => c !== clientObj);
+          document.getElementById('p2pStatusText').textContent =
+            `🟢 Sala Ativa! Jogadores conectados: ${1 + netState.clients.length}/4`;
+          showToast(`🔌 ${clientObj.label} saiu da sala.`, '#7f8c8d');
+          updateCoopTopButton();
+        });
+      });
+
+      peer.on('error', (err) => {
+        showToast('⚠️ Erro PeerJS: ' + (err.type || 'Tente outro código'), '#c0392b');
+      });
+    }
+
+    function joinPeerRoom() {
+      if (typeof Peer === 'undefined') {
+        showToast('⚠️ Biblioteca PeerJS ainda carregando!', '#e67e22');
+        return;
+      }
+      const inputEl = document.getElementById('joinRoomCodeInput');
+      const code = (inputEl.value || '').trim().replace(/\D/g, '');
+      if (code.length < 4) {
+        showToast('⚠️ Digite os 4 números do código da sala!', '#e67e22');
+        return;
+      }
+
+      disconnectPeerRoom(true);
+      state.coopEnabled = false; // Desativa bot local no cliente
+
+      document.getElementById('p2pControlsBox').style.display = 'none';
+      document.getElementById('p2pActiveRoomBox').style.display = 'block';
+      document.getElementById('displayRoomCode').textContent = code;
+      document.getElementById('p2pStatusText').textContent = `⏳ Conectando à sala ${code}...`;
+
+      const peer = new Peer();
+      netState.peer = peer;
+      netState.roomCode = code;
+      netState.mode = 'CLIENT';
+
+      peer.on('open', () => {
+        const conn = peer.connect(`flores-emocoes-room-${code}`, { reliable: true });
+        netState.hostConn = conn;
+
+        conn.on('open', () => {
+          document.getElementById('p2pStatusText').textContent = `🟢 Conectado à sala ${code}!`;
+        });
+
+        conn.on('data', (msg) => {
+          if (!msg || typeof msg !== 'object') return;
+          if (msg.type === 'WELCOME') {
+            netState.myLabel = `${msg.label} (VOCÊ)`;
+            netState.myColor = msg.color;
+            state.player.x = msg.startX || 360;
+            state.player.y = msg.startY || 220;
+            state.tutorialOpen = false;
+            document.getElementById('tutorialModal').classList.remove('active');
+            document.getElementById('p2pStatusText').textContent = `🟢 Conectado como ${msg.label} na Sala ${code}!`;
+            showToast(`🎉 Conectado na floricultura como ${msg.label}!`, '#27ae60');
+            updateCoopTopButton();
+          } else if (msg.type === 'STATE_SYNC') {
+            applyHostStateOnClient(msg);
+          } else if (msg.type === 'TOAST') {
+            showToast(msg.text, msg.bgColor);
+            if (msg.sound) playSound(msg.sound);
+          }
+        });
+
+        conn.on('close', () => {
+          showToast('🔌 O Host encerrou a sala P2P.', '#e74c3c');
+          disconnectPeerRoom();
+        });
+      });
+
+      peer.on('error', () => {
+        showToast('❌ Não foi possível encontrar a sala ' + code, '#c0392b');
+        disconnectPeerRoom();
+      });
+    }
+
+    function disconnectPeerRoom(silent = false) {
+      if (netState.hostConn) {
+        try { netState.hostConn.close(); } catch (e) {}
+      }
+      netState.clients.forEach(c => {
+        try { c.conn.close(); } catch (e) {}
+      });
+      if (netState.peer) {
+        try { netState.peer.destroy(); } catch (e) {}
+      }
+      netState.mode = 'OFFLINE';
+      netState.roomCode = '';
+      netState.peer = null;
+      netState.hostConn = null;
+      netState.clients = [];
+      netState.remotePlayers = [];
+      netState.myLabel = 'VOCÊ (P1)';
+      netState.myColor = PEER_COLORS[0];
+
+      document.getElementById('p2pControlsBox').style.display = 'flex';
+      document.getElementById('p2pActiveRoomBox').style.display = 'none';
+      updateCoopTopButton();
+      if (!silent) {
+        showToast('🔌 Sala P2P desconectada.', '#7f8c8d');
+      }
+    }
+
+    function broadcastToast(text, bgColor, sound = null) {
+      showToast(text, bgColor);
+      if (sound) playSound(sound);
+      if (netState.mode === 'HOST') {
+        netState.clients.forEach(c => {
+          if (c.conn && c.conn.open) {
+            c.conn.send({ type: 'TOAST', text, bgColor, sound });
+          }
+        });
+      }
+    }
+
+    function broadcastHostState() {
+      if (netState.mode !== 'HOST') return;
+      const allPlayers = [
+        {
+          id: 'P1',
+          label: 'P1 (Host)',
+          color: PEER_COLORS[0],
+          x: Math.round(state.player.x),
+          y: Math.round(state.player.y),
+          facingAngle: state.player.facingAngle,
+          heldFlower: state.player.heldFlower
+        },
+        ...netState.clients.map(c => ({
+          id: c.label,
+          label: c.label,
+          color: c.color,
+          x: Math.round(c.x),
+          y: Math.round(c.y),
+          facingAngle: c.facingAngle,
+          heldFlower: c.heldFlower
+        }))
+      ];
+
+      netState.remotePlayers = netState.clients.map(c => ({
+        label: `🤝 ${c.label}`,
+        color: c.color,
+        x: c.x,
+        y: c.y,
+        facingAngle: c.facingAngle,
+        heldFlower: c.heldFlower
+      }));
+
+      const packet = {
+        type: 'STATE_SYNC',
+        money: state.money,
+        day: state.day,
+        customersSpawnedInDay: state.customersSpawnedInDay,
+        customersServedInDay: state.customersServedInDay,
+        customersPerDay: state.customersPerDay,
+        totalHits: state.totalHits,
+        tableBouquet: state.tableBouquet,
+        pingedFlowerId: state.pingedFlowerId,
+        customerSlots: state.customerSlots,
+        allPlayers
+      };
+
+      netState.clients.forEach(c => {
+        if (c.conn && c.conn.open) {
+          c.conn.send(packet);
+        }
+      });
+    }
+
+    function applyHostStateOnClient(msg) {
+      state.money = msg.money;
+      state.day = msg.day;
+      state.customersSpawnedInDay = msg.customersSpawnedInDay;
+      state.customersServedInDay = msg.customersServedInDay;
+      state.customersPerDay = msg.customersPerDay;
+      state.totalHits = msg.totalHits;
+      state.tableBouquet = msg.tableBouquet || [];
+      state.pingedFlowerId = msg.pingedFlowerId || null;
+      state.customerSlots = msg.customerSlots || state.customerSlots;
+
+      const myId = netState.myLabel.split(' ')[0]; // ex: 'P2'
+      const meInPacket = (msg.allPlayers || []).find(p => p.id === myId);
+      if (meInPacket) {
+        state.player.heldFlower = meInPacket.heldFlower;
+      }
+
+      netState.remotePlayers = (msg.allPlayers || [])
+        .filter(p => p.id !== myId)
+        .map(p => ({
+          label: `🤝 ${p.label}`,
+          color: p.color,
+          x: p.x,
+          y: p.y,
+          facingAngle: p.facingAngle,
+          heldFlower: p.heldFlower
+        }));
+
+      updateOrderBannerUI();
+      updateHUD();
+    }
+
+    function handleRemoteClientInteract(clientObj, target) {
+      if (!target) return;
+      if (target.kind === 'FLOWER_POT') {
+        const fl = FLOWERS.find(f => f.id === target.data.id);
+        if (fl) {
+          clientObj.heldFlower = fl;
+          if (state.pingedFlowerId === fl.id) state.pingedFlowerId = null;
+          playSound('pick');
+        }
+      } else if (target.kind === 'BOUQUET_TABLE') {
+        if (clientObj.heldFlower) {
+          if (state.tableBouquet.length < 2) {
+            state.tableBouquet.push(clientObj.heldFlower);
+            clientObj.heldFlower = null;
+            broadcastToast(`💐 ${clientObj.label} colocou flor na Mesa (${state.tableBouquet.length}/2)!`, '#2980b9', 'place');
+          } else {
+            const oldF = state.tableBouquet.pop();
+            state.tableBouquet.push(clientObj.heldFlower);
+            clientObj.heldFlower = oldF;
+            broadcastToast(`🔄 ${clientObj.label} trocou a 2ª flor da Mesa!`, '#f39c12', 'place');
+          }
+        } else if (state.tableBouquet.length > 0) {
+          clientObj.heldFlower = state.tableBouquet.pop();
+          playSound('pick');
+        }
+      } else if (target.kind === 'CUSTOMER_SLOT') {
+        // Entrega realizada pelo jogador remoto (P2/P3/P4)
+        const savedHostFlower = state.player.heldFlower;
+        state.player.heldFlower = clientObj.heldFlower;
+        deliverToCustomerSlot(target.data.slotIndex);
+        clientObj.heldFlower = state.player.heldFlower;
+        state.player.heldFlower = savedHostFlower;
+      } else if (target.kind === 'TRASH') {
+        if (clientObj.heldFlower) {
+          clientObj.heldFlower = null;
+          playSound('trash');
+        } else if (state.tableBouquet.length > 0) {
+          state.tableBouquet = [];
+          broadcastToast(`🗑️ ${clientObj.label} limpou a Mesa de Montagem!`, '#7f8c8d', 'trash');
+        }
+      }
+      updateOrderBannerUI();
+      broadcastHostState();
+    }
+
+    /**************************************************************
+     * 4. ÁUDIO E MÚSICA DE FUNDO ALEGRE (WEB AUDIO API)
+     **************************************************************/
+    // Bloqueia completamente seleção de texto, menu de contexto (segurar dedo no celular) e arrastar elementos (exceto no campo de código da sala)
+    window.addEventListener('selectstart', (e) => {
+      if (e.target && e.target.tagName === 'INPUT') return;
+      e.preventDefault();
+    });
+    window.addEventListener('contextmenu', (e) => e.preventDefault());
+    window.addEventListener('dragstart', (e) => e.preventDefault());
+
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    let audioCtx = null;
+    let musicEnabled = true;
+    let musicStarted = false;
+    let stepIndex = 0;
+
+    // Melodia alegre e saltitante de Floricultura (estilo Overcooked / Nintendo Shop em Dó Maior)
+    // Cada passo dura 210ms (ritmo animado!)
+    const HAPPY_SEQUENCE = [
+      // Compasso 1: C Major (Dó - Mi - Sol - Dó6 - Sol - Mi)
+      { bass: 261.63, chord: [523.25, 659.25], mel: 523.25 },
+      { bass: null,   chord: null,             mel: 659.25 },
+      { bass: 392.00, chord: [523.25, 659.25], mel: 783.99 },
+      { bass: null,   chord: null,             mel: 1046.50 },
+      { bass: 261.63, chord: [523.25, 659.25], mel: 783.99 },
+      { bass: null,   chord: null,             mel: 659.25 },
+      { bass: 392.00, chord: [523.25, 659.25], mel: 783.99 },
+      { bass: null,   chord: null,             mel: null },
+
+      // Compasso 2: F Major (Fá - Lá - Dó - Lá - Sol - Fá)
+      { bass: 349.23, chord: [587.33, 698.46], mel: 698.46 },
+      { bass: null,   chord: null,             mel: 880.00 },
+      { bass: 261.63, chord: [587.33, 698.46], mel: 1046.50 },
+      { bass: null,   chord: null,             mel: 880.00 },
+      { bass: 349.23, chord: [587.33, 698.46], mel: 783.99 },
+      { bass: null,   chord: null,             mel: 698.46 },
+      { bass: 261.63, chord: [523.25, 659.25], mel: 659.25 },
+      { bass: null,   chord: null,             mel: null },
+
+      // Compasso 3: G Major (Sol - Si - Ré - Sol6 - Fá - Mi - Ré)
+      { bass: 392.00, chord: [493.88, 587.33], mel: 587.33 },
+      { bass: null,   chord: null,             mel: 783.99 },
+      { bass: 293.66, chord: [493.88, 587.33], mel: 987.77 },
+      { bass: null,   chord: null,             mel: 783.99 },
+      { bass: 392.00, chord: [493.88, 587.33], mel: 880.00 },
+      { bass: null,   chord: null,             mel: 783.99 },
+      { bass: 293.66, chord: [493.88, 587.33], mel: 587.33 },
+      { bass: null,   chord: null,             mel: 659.25 },
+
+      // Compasso 4: C Major Final alegre (Dó - Mi - Sol - Dó!)
+      { bass: 261.63, chord: [523.25, 659.25], mel: 523.25 },
+      { bass: null,   chord: null,             mel: 659.25 },
+      { bass: 392.00, chord: [523.25, 659.25], mel: 783.99 },
+      { bass: null,   chord: null,             mel: 659.25 },
+      { bass: 261.63, chord: [523.25, 783.99], mel: 1046.50 },
+      { bass: null,   chord: null,             mel: null },
+      { bass: 392.00, chord: [523.25, 659.25], mel: 783.99 },
+      { bass: null,   chord: null,             mel: null }
+    ];
+
+    function ensureAudioContext() {
+      if (!audioCtx) audioCtx = new AudioCtx();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      if (musicEnabled && !musicStarted) startCozyMusicLoop();
+    }
+
+    function playBouncyNote(freq, type, maxGain, duration) {
+      if (!audioCtx || !musicEnabled || !freq) return;
+      const now = audioCtx.currentTime;
+      const osc = audioCtx.createOscillator();
+      const filter = audioCtx.createBiquadFilter();
+      const gain = audioCtx.createGain();
+
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, now);
+
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(1600, now);
+
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.linearRampToValueAtTime(maxGain, now + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0008, now + duration);
+
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(audioCtx.destination);
+
+      osc.start(now);
+      osc.stop(now + duration + 0.02);
+    }
+
+    function playHappyStep() {
+      if (!musicEnabled || !audioCtx) return;
+      const step = HAPPY_SEQUENCE[stepIndex % HAPPY_SEQUENCE.length];
+      stepIndex++;
+
+      // Baixo acústico saltitante (triangle)
+      if (step.bass) {
+        playBouncyNote(step.bass, 'triangle', 0.075, 0.24);
+      }
+      // Acorde leve de ukulele/marimba no contratempo
+      if (step.chord) {
+        step.chord.forEach(cf => playBouncyNote(cf, 'sine', 0.032, 0.16));
+      }
+      // Melodia alegre principal (marimba/flauta doce suave)
+      if (step.mel) {
+        playBouncyNote(step.mel, 'triangle', 0.085, 0.28);
+      }
+    }
+
+    function startCozyMusicLoop() {
+      if (musicStarted) return;
+      musicStarted = true;
+      playHappyStep();
+      setInterval(playHappyStep, 210);
+    }
+
+    function toggleMusic() {
+      ensureAudioContext();
+      musicEnabled = !musicEnabled;
+      const btn = document.getElementById('btnToggleMusic');
+      btn.textContent = musicEnabled ? '🎵 Som' : '🔇 Mudo';
+    }
+
+    window.addEventListener('pointerdown', ensureAudioContext, { once: false });
+    window.addEventListener('keydown', ensureAudioContext, { once: false });
+
+    function playSound(type) {
+      try {
+        ensureAudioContext();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        const now = audioCtx.currentTime;
+
+        if (type === 'pick') {
+          osc.frequency.setValueAtTime(480, now);
+          osc.frequency.exponentialRampToValueAtTime(650, now + 0.08);
+          gain.gain.setValueAtTime(0.14, now);
+          gain.gain.linearRampToValueAtTime(0.01, now + 0.08);
+          osc.start(now); osc.stop(now + 0.08);
+        } else if (type === 'place') {
+          osc.frequency.setValueAtTime(350, now);
+          osc.frequency.exponentialRampToValueAtTime(520, now + 0.09);
+          gain.gain.setValueAtTime(0.15, now);
+          gain.gain.linearRampToValueAtTime(0.01, now + 0.09);
+          osc.start(now); osc.stop(now + 0.09);
+        } else if (type === 'trash') {
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(240, now);
+          osc.frequency.linearRampToValueAtTime(150, now + 0.1);
+          gain.gain.setValueAtTime(0.11, now);
+          gain.gain.linearRampToValueAtTime(0.01, now + 0.1);
+          osc.start(now); osc.stop(now + 0.1);
+        } else if (type === 'success') {
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(523.25, now);
+          osc.frequency.setValueAtTime(659.25, now + 0.1);
+          osc.frequency.setValueAtTime(783.99, now + 0.2);
+          gain.gain.setValueAtTime(0.22, now);
+          gain.gain.linearRampToValueAtTime(0.01, now + 0.38);
+          osc.start(now); osc.stop(now + 0.38);
+        } else if (type === 'error') {
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(220, now);
+          osc.frequency.linearRampToValueAtTime(135, now + 0.3);
+          gain.gain.setValueAtTime(0.18, now);
+          gain.gain.linearRampToValueAtTime(0.01, now + 0.3);
+          osc.start(now); osc.stop(now + 0.3);
+        }
+      } catch (e) {}
+    }
+
+    /**************************************************************
+     * 5. GERAÇÃO DOS PEDIDOS DOS 3 TIPOS DE CLIENTES
+     **************************************************************/
+    function pickRandom(arr) {
+      return arr[Math.floor(Math.random() * arr.length)];
+    }
+
+    function generateOrder(forcedType = null) {
+      let type = forcedType || state.forcedNextType;
+      state.forcedNextType = null;
+
+      if (!type) {
+        if (state.day === 1 && state.customersSpawnedInDay < 2) {
+          type = state.customersSpawnedInDay === 0 ? 1 : 2;
+        } else {
+          const r = Math.random();
+          if (r < 0.35) type = 1;
+          else if (r < 0.70) type = 2;
+          else type = 3;
+        }
+      }
+
+      // Evita repetir nome ou cor de cliente que já está no balcão
+      const activeNames = new Set(
+        state.customerSlots.filter(s => s.order).map(s => s.order.customerName)
+      );
+      const availNames = CUSTOMER_NAMES.filter(n => !activeNames.has(n));
+      const customerName = pickRandom(availNames.length > 0 ? availNames : CUSTOMER_NAMES);
+      const color = pickRandom(CUSTOMER_COLORS);
+
+      let requirements = [];
+      let dialogueHTML = '';
+      let maxTime = 60;
+
+      if (type === 1) {
+        const twoFlowers = state.day >= 2 ? Math.random() > 0.35 : Math.random() > 0.55;
+        const f1 = pickRandom(FLOWERS);
+        if (!twoFlowers) {
+          requirements = [{ mode: 'FLOWER', flowerId: f1.id }];
+          dialogueHTML = `1 flor: <strong>${f1.emoji} ${f1.name}</strong>`;
+          maxTime = 55;
+        } else {
+          const f2 = pickRandom(FLOWERS.filter(f => f.id !== f1.id));
+          requirements = [
+            { mode: 'FLOWER', flowerId: f1.id },
+            { mode: 'FLOWER', flowerId: f2.id }
+          ];
+          dialogueHTML = `Buquê (2): <strong>${f1.emoji} ${f1.name}</strong> + <strong>${f2.emoji} ${f2.name}</strong>`;
+          maxTime = 64;
+        }
+      } else if (type === 2) {
+        const catKey = pickRandom(Object.keys(CATEGORIES));
+        const cat = CATEGORIES[catKey];
+        const occasion = pickRandom(cat.occasions);
+
+        requirements = [{ mode: 'CATEGORY', categoryId: cat.id, occasionName: occasion }];
+        dialogueHTML = `1 flor p/ <span class="occasion-highlight">${occasion}</span>`;
+        maxTime = 66;
+      } else {
+        const specificFlower = pickRandom(FLOWERS);
+        const catKey = pickRandom(Object.keys(CATEGORIES));
+        const cat = CATEGORIES[catKey];
+        const occasion = pickRandom(cat.occasions);
+
+        requirements = [
+          { mode: 'FLOWER', flowerId: specificFlower.id },
+          { mode: 'CATEGORY', categoryId: cat.id, occasionName: occasion }
+        ];
+        dialogueHTML = `Buquê (2): <strong>${specificFlower.emoji} ${specificFlower.name}</strong> + 1 p/ <span class="occasion-highlight">${occasion}</span>`;
+        maxTime = 72;
+      }
+
+      return { type, customerName, color, requirements, dialogueHTML, maxTime };
+    }
+
+    function spawnCustomerInSlot(slotIndex, forcedType = null) {
+      if (!state.gameActive) return;
+      const slot = state.customerSlots[slotIndex];
+      if (!slot) return;
+
+      const ord = generateOrder(forcedType);
+      slot.order = ord;
+      slot.patienceMax = ord.maxTime;
+      slot.patienceLeft = ord.maxTime;
+      slot.y = 478;
+      slot.state = 'ENTERING';
+      slot.reactionEmoji = '';
+      slot.spawnCooldown = 0;
+
+      state.customersSpawnedInDay++;
+      updateOrderBannerUI();
+      updateHUD();
+    }
+
+    function initDayCustomers() {
+      state.customersPerDay = state.day === 1 ? 6 : (state.day === 2 ? 8 : 9);
+      state.customersSpawnedInDay = 0;
+      state.customersServedInDay = 0;
+
+      const maxSlots = getMaxSimultaneousSlots();
+      state.customerSlots.forEach((slot, idx) => {
+        slot.order = null;
+        slot.state = 'EMPTY';
+        slot.y = 478;
+        slot.reactionEmoji = '';
+        if (idx === 0) {
+          slot.spawnCooldown = 0.1; // Primeiro cliente entra quase imediatamente
+        } else if (idx < maxSlots) {
+          slot.spawnCooldown = idx * 2.2; // Clientes seguintes entram escalonados
+        } else {
+          slot.spawnCooldown = 0;
+        }
+      });
+
+      updateOrderBannerUI();
+      updateHUD();
+    }
+
+    /**************************************************************
+     * 6. MOVIMENTAÇÃO E INTERAÇÃO DO BONECO
+     **************************************************************/
+    window.addEventListener('keydown', (e) => {
+      if (e.target && e.target.tagName === 'INPUT') return;
+      const k = e.key.toLowerCase();
+      keysPressed[k] = true;
+
+      if (e.code === 'Space' || k === 'e') {
+        e.preventDefault();
+        triggerPlayerInteraction();
+      } else if (k === 'q') {
+        e.preventDefault();
+        toggleEncyclopedia();
+      } else if (e.key === 'Escape') {
+        document.getElementById('encycModal').classList.remove('active');
+        document.getElementById('coopModal').classList.remove('active');
+        document.getElementById('debugDrawer').classList.remove('active');
+      }
+
+      if (['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright'].includes(k)) {
+        state.player.targetX = null;
+        state.player.targetY = null;
+        state.player.pendingInteractable = null;
+        state.player.autoInteractOnArrive = false;
+      }
+    });
+
+    window.addEventListener('keyup', (e) => {
+      keysPressed[e.key.toLowerCase()] = false;
+    });
+
+    function setMobileKey(keyChar, isDown, ev) {
+      if (ev) ev.preventDefault();
+      ensureAudioContext();
+      keysPressed[keyChar] = isDown;
+      if (isDown) {
+        state.player.targetX = null;
+        state.player.targetY = null;
+        state.player.pendingInteractable = null;
+        state.player.autoInteractOnArrive = false;
+      }
+    }
+
+    const canvasEl = document.getElementById('gameCanvas');
+    const LOGICAL_W = 960;
+    const LOGICAL_H = 480;
+    let canvasScale = 1;
+
+    // Ajusta o Canvas exatamente 1:1 com os pixels físicos reais da tela (PC ou Celular),
+    // eliminando tanto o borrão de upscale quanto o serrilhado de downscale!
+    function setupHiDPICanvas() {
+      const vp = canvasEl.parentElement;
+      if (!vp) return;
+      const vpRect = vp.getBoundingClientRect();
+      const availW = Math.max(300, vpRect.width - 8);
+      const availH = Math.max(150, vpRect.height - 8);
+      const ratio = LOGICAL_W / LOGICAL_H;
+
+      let cssW = availW;
+      let cssH = cssW / ratio;
+      if (cssH > availH) {
+        cssH = availH;
+        cssW = cssH * ratio;
+      }
+
+      cssW = Math.floor(cssW);
+      cssH = Math.floor(cssH);
+
+      canvasEl.style.width = cssW + 'px';
+      canvasEl.style.height = cssH + 'px';
+
+      const dpr = window.devicePixelRatio || 1;
+      canvasEl.width = Math.round(cssW * dpr);
+      canvasEl.height = Math.round(cssH * dpr);
+      canvasScale = canvasEl.width / LOGICAL_W;
+    }
+    setupHiDPICanvas();
+    window.addEventListener('resize', setupHiDPICanvas);
+    if (window.ResizeObserver && canvasEl.parentElement) {
+      new ResizeObserver(setupHiDPICanvas).observe(canvasEl.parentElement);
+    }
+
+    // Converte o toque/clique da tela exatamente para a coordenada lógica (960x480) do Canvas
+    function getExactCanvasCoords(e) {
+      const rect = canvasEl.getBoundingClientRect();
+      const x = ((e.clientX - rect.left) / rect.width) * LOGICAL_W;
+      const y = ((e.clientY - rect.top) / rect.height) * LOGICAL_H;
+      return { x, y };
+    }
+
+    function walkAndInteractCustomerSlot(slotIndex) {
+      ensureAudioContext();
+      const st = COUNTER_STATIONS.find(s => s.type === 'CUSTOMER_SLOT' && s.slotIndex === slotIndex);
+      if (!st) return;
+      const interactable = { kind: 'CUSTOMER_SLOT', data: st, x: st.x, y: st.y };
+      if (Math.hypot(state.player.x - st.x, state.player.y - 288) < 28) {
+        state.player.facingAngle = Math.atan2(st.y - state.player.y, st.x - state.player.x);
+        state.nearbyInteractable = interactable;
+        triggerPlayerInteraction(interactable);
+      } else {
+        state.player.targetX = st.x;
+        state.player.targetY = 288;
+        state.player.lookAtX = st.x;
+        state.player.lookAtY = st.y;
+        state.player.pendingInteractable = interactable;
+        state.player.autoInteractOnArrive = true;
+      }
+    }
+
+    canvasEl.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      ensureAudioContext();
+      document.getElementById('debugDrawer').classList.remove('active');
+
+      const { x: clickX, y: clickY } = getExactCanvasCoords(e);
+
+      // Procura a flor, estação do balcão ou cliente mais próximo do ponto tocado
+      let tappedStation = null;
+      let bestDist = Infinity;
+
+      FLOWERS.forEach(fl => {
+        const dPot = Math.hypot(clickX - fl.x, clickY - (fl.y + 10));
+        if (dPot < 58 && dPot < bestDist) {
+          bestDist = dPot;
+          tappedStation = {
+            x: fl.x,
+            y: fl.y,
+            walkX: Math.max(138, Math.min(822, fl.x)),
+            walkY: Math.max(105, Math.min(285, fl.y)),
+            interactable: { kind: 'FLOWER_POT', data: fl, x: fl.x, y: fl.y }
+          };
+        }
+      });
+
+      COUNTER_STATIONS.forEach(st => {
+        // Para posições de cliente, permite tocar tanto no balcão (y=336) quanto no boneco do cliente logo abaixo (y=405)!
+        const isCust = st.type === 'CUSTOMER_SLOT';
+        const hitX = Math.abs(clickX - st.x) < 66;
+        const hitY = isCust ? (clickY >= 305 && clickY <= 448) : (Math.abs(clickY - st.y) < 44);
+        if (hitX && hitY) {
+          const dSt = Math.hypot(clickX - st.x, clickY - st.y);
+          if (dSt < bestDist) {
+            bestDist = dSt;
+            tappedStation = {
+              x: st.x,
+              y: st.y,
+              walkX: st.x,
+              walkY: 288,
+              interactable: { kind: st.type, data: st, x: st.x, y: st.y }
+            };
+          }
+        }
+      });
+
+      if (tappedStation) {
+        if (Math.hypot(state.player.x - tappedStation.walkX, state.player.y - tappedStation.walkY) < 28) {
+          state.player.facingAngle = Math.atan2(tappedStation.y - state.player.y, tappedStation.x - state.player.x);
+          state.nearbyInteractable = tappedStation.interactable;
+          triggerPlayerInteraction(tappedStation.interactable);
+        } else {
+          state.player.targetX = tappedStation.walkX;
+          state.player.targetY = tappedStation.walkY;
+          state.player.lookAtX = tappedStation.x;
+          state.player.lookAtY = tappedStation.y;
+          state.player.pendingInteractable = tappedStation.interactable;
+          state.player.autoInteractOnArrive = true;
+        }
+      } else {
+        state.player.targetX = Math.max(138, Math.min(822, clickX));
+        state.player.targetY = Math.max(98, Math.min(295, clickY));
+        state.player.pendingInteractable = null;
+        state.player.autoInteractOnArrive = false;
+      }
+    });
+
+    function findNearbyInteractable() {
+      const p = state.player;
+      let closest = null;
+      let minDist = 78;
+
+      FLOWERS.forEach(flower => {
+        const d = Math.hypot(p.x - flower.x, p.y - flower.y);
+        if (d < minDist) {
+          minDist = d;
+          closest = { kind: 'FLOWER_POT', data: flower, x: flower.x, y: flower.y };
+        }
+      });
+
+      COUNTER_STATIONS.forEach(st => {
+        const d = Math.hypot(p.x - st.x, p.y - st.y);
+        if (d < minDist) {
+          minDist = d;
+          closest = { kind: st.type, data: st, x: st.x, y: st.y };
+        }
+      });
+
+      return closest;
+    }
+
+    function triggerPlayerInteraction(forcedTarget = null) {
+      if (!state.gameActive) return;
+      const target = forcedTarget || state.nearbyInteractable;
+      if (!target) {
+        showToast('💡 Chegue perto de uma planta ou do balcão!', '#7f8c8d');
+        return;
+      }
+
+      // Se for Cliente P2P (PeerJS), envia a interação ao Host autoritativo!
+      if (netState.mode === 'CLIENT') {
+        if (target.kind === 'FLOWER_POT') {
+          state.player.heldFlower = target.data;
+          playSound('pick');
+          updateOrderBannerUI();
+        }
+        if (netState.hostConn && netState.hostConn.open) {
+          netState.hostConn.send({ type: 'INTERACT', target });
+        }
+        return;
+      }
+
+      const p = state.player;
+
+      if (target.kind === 'FLOWER_POT') {
+        p.heldFlower = target.data;
+        if (state.pingedFlowerId === target.data.id) {
+          state.pingedFlowerId = null;
+        }
+        playSound('pick');
+        updateOrderBannerUI();
+      } else if (target.kind === 'BOUQUET_TABLE') {
+        const maxTableSlots = 2; // A Mesa de Montagem comporta até 2 flores para montar buquês
+        if (p.heldFlower) {
+          if (state.tableBouquet.length < maxTableSlots) {
+            state.tableBouquet.push(p.heldFlower);
+            p.heldFlower = null;
+            playSound('place');
+            if (state.tableBouquet.length === 2) {
+              showToast('💐 Buquê de 2 flores pronto! Leve ao cliente (#1, #2 ou #3).', '#27ae60');
+            }
+          } else {
+            const oldFlower = state.tableBouquet.pop();
+            state.tableBouquet.push(p.heldFlower);
+            p.heldFlower = oldFlower;
+            playSound('place');
+            showToast('🔄 Segunda flor trocada na bancada!', '#f39c12');
+          }
+        } else {
+          if (state.tableBouquet.length > 0) {
+            p.heldFlower = state.tableBouquet.pop();
+            playSound('pick');
+            showToast(`✋ Retirou ${p.heldFlower.emoji} da bancada!`, '#2980b9');
+          } else {
+            showToast('✋ Mãos vazias! Pegue flores nos vasos para montar buquê.', '#e67e22');
+          }
+        }
+        updateOrderBannerUI();
+      } else if (target.kind === 'CUSTOMER_SLOT') {
+        const slotIdx = target.data.slotIndex;
+        deliverToCustomerSlot(slotIdx);
+      } else if (target.kind === 'TRASH') {
+        if (p.heldFlower) {
+          p.heldFlower = null;
+          playSound('trash');
+          showToast('🗑️ Flor da mão descartada!', '#7f8c8d');
+        } else if (state.tableBouquet.length > 0) {
+          state.tableBouquet = [];
+          playSound('trash');
+          showToast('🗑️ Mesa de montagem limpa!', '#7f8c8d');
+        } else {
+          showToast('🗑️ Nada para descartar.', '#7f8c8d');
+        }
+        updateOrderBannerUI();
+      }
+    }
+
+    /**************************************************************
+     * 7. AVALIAÇÃO DE ENTREGA POR CLIENTE E ECONOMIA
+     **************************************************************/
+    function evaluateDelivery(requirements, chosenFlowers) {
+      let usedIndices = new Set();
+      let matchedCount = 0;
+
+      for (const req of requirements) {
+        if (req.mode === 'FLOWER') {
+          const idx = chosenFlowers.findIndex((f, i) => !usedIndices.has(i) && f.id === req.flowerId);
+          if (idx !== -1) { usedIndices.add(idx); matchedCount++; }
+        }
+      }
+      for (const req of requirements) {
+        if (req.mode === 'CATEGORY') {
+          const idx = chosenFlowers.findIndex((f, i) => !usedIndices.has(i) && f.category === req.categoryId);
+          if (idx !== -1) { usedIndices.add(idx); matchedCount++; }
+        }
+      }
+      return { totalRequired: requirements.length, matchedCount };
+    }
+
+    function deliverToCustomerSlot(slotIndex) {
+      const maxSlots = getMaxSimultaneousSlots();
+      if (slotIndex >= maxSlots) {
+        showToast('🔒 A Posição #3 do balcão abre a partir do Dia 2!', '#7f8c8d');
+        return;
+      }
+
+      const slot = state.customerSlots[slotIndex];
+      if (!slot || !slot.order || (slot.state !== 'WAITING' && slot.state !== 'ENTERING')) {
+        showToast(`💡 Nenhum cliente aguardando na Posição #${slotIndex + 1}!`, '#7f8c8d');
+        return;
+      }
+
+      const ord = slot.order;
+      const reqLen = ord.requirements.length;
+      const p = state.player;
+      let flowersToDeliver = null;
+
+      if (reqLen === 1) {
+        // Cliente pediu 1 flor: pode entregar direto da mão ou se tiver 1 flor na mesa
+        if (p.heldFlower) {
+          flowersToDeliver = [p.heldFlower];
+          p.heldFlower = null;
+        } else if (state.tableBouquet.length === 1) {
+          flowersToDeliver = [state.tableBouquet[0]];
+          state.tableBouquet = [];
+        } else if (state.tableBouquet.length === 2) {
+          showToast(`⚠️ ${ord.customerName} (#${slotIndex + 1}) pediu apenas 1 flor! O buquê na mesa tem 2.`, '#e67e22');
+          playSound('trash');
+          return;
+        } else {
+          showToast(`✋ Pegue 1 flor nos vasos para entregar a ${ord.customerName} (#${slotIndex + 1})!`, '#e67e22');
+          playSound('trash');
+          return;
+        }
+      } else {
+        // Cliente pediu 2 flores (Buquê): deve ter montado as 2 flores na Mesa de Montagem
+        if (state.tableBouquet.length === 2) {
+          flowersToDeliver = [...state.tableBouquet];
+          state.tableBouquet = [];
+        } else {
+          showToast(`⚠️ ${ord.customerName} (#${slotIndex + 1}) pediu 2 flores! Monte na 💐 Mesa primeiro (${state.tableBouquet.length}/2).`, '#e67e22');
+          playSound('trash');
+          return;
+        }
+      }
+
+      const evalResult = evaluateDelivery(ord.requirements, flowersToDeliver);
+      const isGreenPhase = (slot.patienceLeft / slot.patienceMax) >= 0.5;
+
+      if (evalResult.matchedCount === evalResult.totalRequired) {
+        const baseReward = ord.type === 3 ? 40 : 25;
+        const speedTip = isGreenPhase ? 10 : 0;
+        const totalEarned = baseReward + speedTip;
+
+        state.money += totalEarned;
+        state.totalHits++;
+        state.dayHits++;
+        if (speedTip > 0) state.dayTips += speedTip;
+
+        const tipText = speedTip > 0 ? ` (+$${speedTip} Gorjeta!)` : '';
+        broadcastToast(`✅ #${slotIndex + 1} ${ord.customerName}: +$${totalEarned}${tipText}`, '#27ae60', 'success');
+      } else if (evalResult.matchedCount > 0) {
+        state.money += 10;
+        state.dayHits++;
+        slot.state = 'LEAVING_HAPPY';
+        slot.reactionEmoji = '😐👍';
+        broadcastToast(`⚠️ #${slotIndex + 1} ${ord.customerName} (Acerto Parcial): +$10`, '#f39c12', 'pick');
+      } else {
+        state.money -= 30;
+        state.dayErrors++;
+        slot.state = 'LEAVING_ANGRY';
+        slot.reactionEmoji = '😡💢';
+        broadcastToast(`❌ #${slotIndex + 1} ${ord.customerName}: Flor errada! -$30`, '#c0392b', 'error');
+      }
+
+      state.customersServedInDay++;
+      updateOrderBannerUI();
+      updateHUD();
+      broadcastHostState();
+
+      if (state.money <= 0) {
+        state.money = 0;
+        updateHUD();
+        setTimeout(() => triggerBankruptcy(), 850);
+      }
+    }
+
+    function handleSlotWalkout(slotIndex) {
+      const slot = state.customerSlots[slotIndex];
+      if (!slot || !slot.order || slot.state.startsWith('LEAVING')) return;
+
+      const custName = slot.order.customerName;
+      state.money -= 15;
+      state.dayWalkouts++;
+      state.customersServedInDay++;
+      playSound('error');
+      slot.state = 'LEAVING_ANGRY';
+      slot.reactionEmoji = '⌛😤';
+      showToast(`⌛ #${slotIndex + 1} ${custName} cansou de esperar! (-$15)`, '#e74c3c');
+
+      updateOrderBannerUI();
+      updateHUD();
+
+      if (state.money <= 0) {
+        state.money = 0;
+        updateHUD();
+        setTimeout(() => triggerBankruptcy(), 850);
+      }
+    }
+
+    /**************************************************************
+     * 8. LOOP DE JOGO E DESENHO DO CENÁRIO TOP-DOWN
+     **************************************************************/
+    let lastTick = performance.now();
+    let uiRefreshAccum = 0;
+
+    function gameLoop(now) {
+      const dt = Math.min(0.05, (now - lastTick) / 1000);
+      lastTick = now;
+
+      if (state.gameActive && !state.tutorialOpen) {
+        updatePlayerMovement(dt);
+        state.nearbyInteractable = findNearbyInteractable();
+
+        // Sincronização em tempo real P2P (PeerJS)
+        netState.syncAccum += dt;
+        if (netState.mode === 'CLIENT') {
+          if (netState.syncAccum >= 0.045 && netState.hostConn && netState.hostConn.open) {
+            netState.syncAccum = 0;
+            netState.hostConn.send({
+              type: 'MOVE',
+              x: Math.round(state.player.x),
+              y: Math.round(state.player.y),
+              facingAngle: state.player.facingAngle
+            });
+          }
+          drawShopTopDown();
+          requestAnimationFrame(gameLoop);
+          return;
+        }
+
+        if (state.coopEnabled) {
+          updateCoopPartnerAI(dt);
+        }
+
+        if (netState.mode === 'HOST' && netState.syncAccum >= 0.05) {
+          netState.syncAccum = 0;
+          broadcastHostState();
+        }
+
+        const maxSlots = getMaxSimultaneousSlots();
+        let anyTimerChanged = false;
+
+        for (let i = 0; i < maxSlots; i++) {
+          const slot = state.customerSlots[i];
+          if (slot.state === 'EMPTY') {
+            if (state.customersSpawnedInDay < state.customersPerDay) {
+              if (slot.spawnCooldown <= 0) {
+                slot.spawnCooldown = 1.6;
+              } else {
+                slot.spawnCooldown -= dt;
+                if (slot.spawnCooldown <= 0) {
+                  spawnCustomerInSlot(i);
+                }
+              }
+            }
+          } else if (slot.state === 'ENTERING') {
+            slot.y -= 115 * dt;
+            if (slot.y <= slot.targetY) {
+              slot.y = slot.targetY;
+              slot.state = 'WAITING';
+            }
+          } else if (slot.state === 'WAITING') {
+            if (!state.timerPaused) {
+              slot.patienceLeft = Math.max(0, slot.patienceLeft - dt);
+              anyTimerChanged = true;
+              if (slot.patienceLeft <= 0) {
+                handleSlotWalkout(i);
+              }
+            }
+          } else if (slot.state.startsWith('LEAVING')) {
+            slot.y += 135 * dt;
+            if (slot.y >= 485) {
+              slot.state = 'EMPTY';
+              slot.order = null;
+              slot.reactionEmoji = '';
+              updateOrderBannerUI();
+
+              if (state.money > 0) {
+                const allActiveDone = state.customerSlots.every(s => s.state === 'EMPTY');
+                if (state.customersServedInDay >= state.customersPerDay && allActiveDone) {
+                  triggerEndOfDay();
+                } else if (state.customersSpawnedInDay < state.customersPerDay) {
+                  slot.spawnCooldown = 1.4;
+                }
+              }
+            }
+          }
+        }
+
+        if (anyTimerChanged) {
+          uiRefreshAccum += dt;
+          if (uiRefreshAccum >= 0.2) {
+            uiRefreshAccum = 0;
+            updatePatienceBarsInDOM();
+          }
+        }
+      }
+
+      drawShopTopDown();
+      requestAnimationFrame(gameLoop);
+    }
+
+    function updatePlayerMovement(dt) {
+      const p = state.player;
+      let dx = 0;
+      let dy = 0;
+
+      if (keysPressed['w'] || keysPressed['arrowup']) dy -= 1;
+      if (keysPressed['s'] || keysPressed['arrowdown']) dy += 1;
+      if (keysPressed['a'] || keysPressed['arrowleft']) dx -= 1;
+      if (keysPressed['d'] || keysPressed['arrowright']) dx += 1;
+
+      if (dx !== 0 || dy !== 0) {
+        const len = Math.hypot(dx, dy);
+        dx /= len; dy /= len;
+        p.x += dx * p.speed * dt;
+        p.y += dy * p.speed * dt;
+        p.facingAngle = Math.atan2(dy, dx);
+      } else if (p.targetX !== null && p.targetY !== null) {
+        const dist = Math.hypot(p.targetX - p.x, p.targetY - p.y);
+        if (dist > 8) {
+          const ux = (p.targetX - p.x) / dist;
+          const uy = (p.targetY - p.y) / dist;
+          p.x += ux * p.speed * dt;
+          p.y += uy * p.speed * dt;
+          p.facingAngle = Math.atan2(uy, ux);
+        } else {
+          p.x = p.targetX;
+          p.y = p.targetY;
+          p.targetX = null;
+          p.targetY = null;
+          if (p.autoInteractOnArrive) {
+            p.autoInteractOnArrive = false;
+            if (p.lookAtX !== undefined) {
+              p.facingAngle = Math.atan2(p.lookAtY - p.y, p.lookAtX - p.x);
+            }
+            const targetToUse = p.pendingInteractable || findNearbyInteractable();
+            p.pendingInteractable = null;
+            state.nearbyInteractable = targetToUse;
+            triggerPlayerInteraction(targetToUse);
+          }
+        }
+      }
+
+      p.x = Math.max(138, Math.min(822, p.x));
+      p.y = Math.max(98, Math.min(295, p.y));
+    }
+
+    // Inteligência Cooperativa do Parceiro P2 (Simula o Modo Co-op 1 a 4 Jogadores do GDD!)
+    function resolveFlowerForRequirement(req) {
+      if (req.mode === 'FLOWER') {
+        return FLOWERS.find(f => f.id === req.flowerId);
+      }
+      const matching = FLOWERS.filter(f => f.category === req.categoryId);
+      return matching.length > 0 ? matching[0] : FLOWERS[0];
+    }
+
+    function updateCoopPartnerAI(dt) {
+      const bot = state.coopPartner;
+      const maxSlots = getMaxSimultaneousSlots();
+
+      // Se o jogador marcou uma flor na Enciclopédia (Ping Co-op) e o P2 está de mãos vazias, o P2 prioriza buscá-la!
+      if (state.pingedFlowerId && !bot.heldFlower && (!bot.task || !bot.task.isPingTask)) {
+        const pingFl = FLOWERS.find(f => f.id === state.pingedFlowerId);
+        if (pingFl) {
+          bot.task = { step: 'PICK', flower: pingFl, isPingTask: true };
+        }
+      }
+
+      if (!bot.task) {
+        bot.aiTimer -= dt;
+        if (bot.aiTimer > 0) return;
+        bot.aiTimer = 0.7;
+
+        // 1. Se o P2 já está segurando uma flor, decide onde colocá-la
+        if (bot.heldFlower) {
+          // Verifica se algum cliente de 1 flor precisa exatamente dessa flor
+          const slot1Idx = state.customerSlots.findIndex((s, idx) =>
+            idx < maxSlots && s.order && s.state === 'WAITING' && s.order.requirements.length === 1 &&
+            evaluateDelivery(s.order.requirements, [bot.heldFlower]).matchedCount === 1
+          );
+          if (slot1Idx !== -1) {
+            bot.task = { step: 'DELIVER_HAND', slotIndex: slot1Idx };
+            return;
+          }
+          // Caso contrário, leva para a Mesa de Montagem compartilhada se houver espaço
+          if (state.tableBouquet.length < 2) {
+            bot.task = { step: 'PLACE_TABLE' };
+            return;
+          }
+        }
+
+        // 2. Se a Mesa de Montagem já está com Buquê Pronto (2/2), verifica se corresponde a algum cliente de 2 flores para entregar
+        if (state.tableBouquet.length === 2 && !bot.heldFlower) {
+          const readySlotIdx = state.customerSlots.findIndex((s, idx) =>
+            idx < maxSlots && s.order && s.state === 'WAITING' && s.order.requirements.length === 2 &&
+            evaluateDelivery(s.order.requirements, state.tableBouquet).matchedCount === 2
+          );
+          if (readySlotIdx !== -1) {
+            bot.task = { step: 'DELIVER_TABLE', slotIndex: readySlotIdx };
+            return;
+          }
+        }
+
+        // 3. Procura um cliente esperando para ajudar (prioriza pedidos de 1 flor ou completar a Mesa de Montagem)
+        for (let i = 0; i < maxSlots; i++) {
+          const s = state.customerSlots[i];
+          if (!s || !s.order || s.state !== 'WAITING') continue;
+          if (s.order.requirements.length === 1) {
+            const fl = resolveFlowerForRequirement(s.order.requirements[0]);
+            bot.task = { step: 'PICK', flower: fl, targetSlot: i };
+            return;
+          } else if (s.order.requirements.length === 2 && state.tableBouquet.length < 2) {
+            const reqIdx = state.tableBouquet.length; // 0 para 1ª flor, 1 para 2ª flor
+            const fl = resolveFlowerForRequirement(s.order.requirements[reqIdx]);
+            bot.task = { step: 'PICK', flower: fl, targetSlot: i };
+            return;
+          }
+        }
+        return;
+      }
+
+      // Executa o passo atual da tarefa do Parceiro Co-op (P2)
+      let destX = bot.x;
+      let destY = bot.y;
+
+      if (bot.task.step === 'PICK') {
+        destX = Math.max(138, Math.min(822, bot.task.flower.x));
+        destY = Math.max(105, Math.min(285, bot.task.flower.y));
+      } else if (bot.task.step === 'PLACE_TABLE') {
+        destX = 320;
+        destY = 288;
+      } else if (bot.task.step === 'DELIVER_HAND' || bot.task.step === 'DELIVER_TABLE') {
+        const st = COUNTER_STATIONS.find(s => s.type === 'CUSTOMER_SLOT' && s.slotIndex === bot.task.slotIndex);
+        destX = st ? st.x : 468;
+        destY = 288;
+      }
+
+      const dist = Math.hypot(destX - bot.x, destY - bot.y);
+      if (dist > 8) {
+        const ux = (destX - bot.x) / dist;
+        const uy = (destY - bot.y) / dist;
+        bot.x += ux * bot.speed * dt;
+        bot.y += uy * bot.speed * dt;
+        bot.facingAngle = Math.atan2(uy, ux);
+      } else {
+        bot.x = destX;
+        bot.y = destY;
+
+        if (bot.task.step === 'PICK') {
+          bot.heldFlower = bot.task.flower;
+          if (state.pingedFlowerId === bot.heldFlower.id) {
+            state.pingedFlowerId = null; // Limpa o Ping após o P2 coletar a flor marcada!
+          }
+          playSound('pick');
+          bot.task = null;
+          bot.aiTimer = 0.35;
+        } else if (bot.task.step === 'PLACE_TABLE') {
+          if (bot.heldFlower && state.tableBouquet.length < 2) {
+            state.tableBouquet.push(bot.heldFlower);
+            bot.heldFlower = null;
+            playSound('place');
+            updateOrderBannerUI();
+            showToast('🤝 P2 colocou flor na Mesa de Montagem!', '#2980b9');
+          }
+          bot.task = null;
+          bot.aiTimer = 0.6;
+        } else if (bot.task.step === 'DELIVER_HAND') {
+          const sIdx = bot.task.slotIndex;
+          const slot = state.customerSlots[sIdx];
+          if (bot.heldFlower && slot && slot.order && slot.state === 'WAITING' && slot.order.requirements.length === 1) {
+            // Entrega feita pelo P2
+            const savedPlayerHand = state.player.heldFlower;
+            state.player.heldFlower = bot.heldFlower;
+            bot.heldFlower = null;
+            deliverToCustomerSlot(sIdx);
+            state.player.heldFlower = savedPlayerHand;
+            updateOrderBannerUI();
+          } else {
+            bot.heldFlower = null;
+          }
+          bot.task = null;
+          bot.aiTimer = 0.9;
+        } else if (bot.task.step === 'DELIVER_TABLE') {
+          const sIdx = bot.task.slotIndex;
+          const slot = state.customerSlots[sIdx];
+          if (state.tableBouquet.length === 2 && slot && slot.order && slot.state === 'WAITING' && slot.order.requirements.length === 2) {
+            deliverToCustomerSlot(sIdx);
+          }
+          bot.task = null;
+          bot.aiTimer = 0.9;
+        }
+      }
+    }
+
+    // Desenha cada uma das 10 flores em Vetor 2D Puro (qualidade infinita sem borrão em qualquer tela!)
+    function drawVectorFlower(ctx, flowerId, cx, cy, scale = 1) {
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.scale(scale, scale);
+
+      if (flowerId === 'rosa_vermelha') {
+        // Folhas verdes na base
+        ctx.fillStyle = '#27ae60';
+        ctx.beginPath(); ctx.ellipse(-7, 6, 6, 3.5, -0.5, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(7, 6, 6, 3.5, 0.5, 0, Math.PI * 2); ctx.fill();
+        // Pétalas externas vermelhas
+        ctx.fillStyle = '#c0392b';
+        for (let i = 0; i < 6; i++) {
+          const a = (i * Math.PI) / 3;
+          ctx.beginPath();
+          ctx.arc(Math.cos(a) * 5.5, Math.sin(a) * 5.5 - 1, 5.5, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        // Miolo espiral carmim/vermelho vivo
+        ctx.fillStyle = '#e74c3c';
+        ctx.beginPath(); ctx.arc(0, -1, 6.2, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = '#922b21';
+        ctx.lineWidth = 1.6;
+        ctx.beginPath(); ctx.arc(0, -1, 3.5, 0.2, Math.PI * 1.65); ctx.stroke();
+      } else if (flowerId === 'tulipa_carmim') {
+        // Haste e folhas
+        ctx.strokeStyle = '#27ae60';
+        ctx.lineWidth = 2.6;
+        ctx.beginPath(); ctx.moveTo(0, 2); ctx.lineTo(0, 11); ctx.stroke();
+        ctx.fillStyle = '#2ecc71';
+        ctx.beginPath(); ctx.ellipse(-5, 7, 5, 2.5, -0.7, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(5, 7, 5, 2.5, 0.7, 0, Math.PI * 2); ctx.fill();
+        // Cálice da tulipa (3 pétalas apontadas)
+        ctx.fillStyle = '#d81b60';
+        ctx.beginPath(); ctx.ellipse(-4.5, -2, 4.5, 7.5, -0.2, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(4.5, -2, 4.5, 7.5, 0.2, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#ec407a';
+        ctx.beginPath(); ctx.ellipse(0, -3, 5, 8, 0, 0, Math.PI * 2); ctx.fill();
+      } else if (flowerId === 'girassol') {
+        // 12 pétalas douradas
+        ctx.fillStyle = '#f1c40f';
+        ctx.strokeStyle = '#d68910';
+        ctx.lineWidth = 0.8;
+        for (let i = 0; i < 12; i++) {
+          ctx.save();
+          ctx.rotate((i * Math.PI) / 6);
+          ctx.beginPath();
+          ctx.ellipse(0, -9, 3.2, 5.5, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+          ctx.restore();
+        }
+        // Centro marrom escuro com sementes
+        ctx.fillStyle = '#5d4037';
+        ctx.beginPath(); ctx.arc(0, 0, 6.2, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#f39c12';
+        ctx.beginPath();
+        ctx.arc(-2, -2, 1, 0, Math.PI * 2);
+        ctx.arc(2, -1, 1, 0, Math.PI * 2);
+        ctx.arc(0, 2, 1, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (flowerId === 'gerbera_dourada') {
+        // 10 pétalas amarelo-alaranjadas arredondadas
+        ctx.fillStyle = '#ffca28';
+        ctx.strokeStyle = '#f57f17';
+        ctx.lineWidth = 1;
+        for (let i = 0; i < 10; i++) {
+          ctx.save();
+          ctx.rotate((i * Math.PI) / 5);
+          ctx.beginPath();
+          ctx.ellipse(0, -8, 3.6, 5.2, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+          ctx.restore();
+        }
+        ctx.fillStyle = '#e65100';
+        ctx.beginPath(); ctx.arc(0, 0, 4.5, 0, Math.PI * 2); ctx.fill();
+      } else if (flowerId === 'hortensia_azul') {
+        // Folhas de fundo
+        ctx.fillStyle = '#27ae60';
+        ctx.beginPath(); ctx.arc(-6, 6, 5, 0, Math.PI * 2); ctx.arc(6, 6, 5, 0, Math.PI * 2); ctx.fill();
+        // Buquê de mini-flores azuis (4 floretes)
+        const florets = [[-4.5, -3], [4.5, -3], [-4, 4], [4, 4], [0, 0]];
+        florets.forEach(([fx, fy], idx) => {
+          ctx.fillStyle = idx === 4 ? '#2980b9' : '#5dade2';
+          for (let p = 0; p < 4; p++) {
+            const a = (p * Math.PI) / 2 + 0.4;
+            ctx.beginPath();
+            ctx.arc(fx + Math.cos(a) * 3.2, fy + Math.sin(a) * 3.2, 3.2, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          ctx.fillStyle = '#fff';
+          ctx.beginPath(); ctx.arc(fx, fy, 1.3, 0, Math.PI * 2); ctx.fill();
+        });
+      } else if (flowerId === 'lavanda_azul') {
+        // Haste verde
+        ctx.strokeStyle = '#27ae60';
+        ctx.lineWidth = 2.4;
+        ctx.beginPath(); ctx.moveTo(0, -8); ctx.lineTo(0, 11); ctx.stroke();
+        // Espigas violeta/azul
+        ctx.fillStyle = '#8e44ad';
+        const buds = [[-3.5, -6], [3.5, -6], [-4, -1.5], [4, -1.5], [-3.5, 3], [3.5, 3], [0, -9.5]];
+        buds.forEach(([bx, by]) => {
+          ctx.beginPath();
+          ctx.ellipse(bx, by, 2.8, 3.8, bx < 0 ? -0.35 : (bx > 0 ? 0.35 : 0), 0, Math.PI * 2);
+          ctx.fill();
+        });
+      } else if (flowerId === 'lirio_branco') {
+        // 6 pétalas estrelares brancas com contorno suave
+        ctx.fillStyle = '#ffffff';
+        ctx.strokeStyle = '#bdc3c7';
+        ctx.lineWidth = 1.2;
+        for (let i = 0; i < 6; i++) {
+          ctx.save();
+          ctx.rotate((i * Math.PI) / 3);
+          ctx.beginPath();
+          ctx.ellipse(0, -7.5, 3.6, 6.2, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+          ctx.restore();
+        }
+        // Estames dourados no centro
+        ctx.fillStyle = '#f1c40f';
+        ctx.beginPath(); ctx.arc(0, 0, 3.2, 0, Math.PI * 2); ctx.fill();
+      } else if (flowerId === 'crisantemo_branco') {
+        // Múltiplas camadas de pétalas brancas e pérola
+        ctx.fillStyle = '#ffffff';
+        ctx.strokeStyle = '#95a5a6';
+        ctx.lineWidth = 1;
+        for (let i = 0; i < 12; i++) {
+          ctx.save();
+          ctx.rotate((i * Math.PI) / 6);
+          ctx.beginPath();
+          ctx.ellipse(0, -7.5, 2.8, 5.5, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+          ctx.restore();
+        }
+        ctx.fillStyle = '#fef9e7';
+        ctx.beginPath(); ctx.arc(0, 0, 4.5, 0, Math.PI * 2); ctx.fill();
+        ctx.stroke();
+      } else if (flowerId === 'orquidea_verde') {
+        // 5 pétalas verde-limão + labelo esmeralda
+        ctx.fillStyle = '#58d68d';
+        ctx.strokeStyle = '#1d8348';
+        ctx.lineWidth = 1.2;
+        for (let i = 0; i < 5; i++) {
+          ctx.save();
+          ctx.rotate((i * Math.PI * 2) / 5);
+          ctx.beginPath();
+          ctx.ellipse(0, -7.2, 3.8, 5.8, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+          ctx.restore();
+        }
+        ctx.fillStyle = '#196f3d';
+        ctx.beginPath(); ctx.arc(0, 1, 4, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#f1c40f';
+        ctx.beginPath(); ctx.arc(0, 0.5, 1.6, 0, Math.PI * 2); ctx.fill();
+      } else if (flowerId === 'cravo_esperanca') {
+        // Haste e 2 folhas vibrantes
+        ctx.strokeStyle = '#1e8449';
+        ctx.lineWidth = 2.6;
+        ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, 11); ctx.stroke();
+        ctx.fillStyle = '#27ae60';
+        ctx.beginPath(); ctx.ellipse(-6, 5, 5.5, 3, -0.4, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(6, 5, 5.5, 3, 0.4, 0, Math.PI * 2); ctx.fill();
+        // Coroa franzida do cravo verde/rosado
+        ctx.fillStyle = '#2ecc71';
+        ctx.strokeStyle = '#145a32';
+        ctx.lineWidth = 1.2;
+        for (let i = 0; i < 7; i++) {
+          const a = Math.PI + (i * Math.PI) / 6;
+          ctx.beginPath();
+          ctx.arc(Math.cos(a) * 5, Math.sin(a) * 4 - 2, 4.5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+        }
+        ctx.fillStyle = '#abebc6';
+        ctx.beginPath(); ctx.arc(0, -3.5, 4.2, 0, Math.PI * 2); ctx.fill();
+      }
+
+      ctx.restore();
+    }
+
+    function drawShopTopDown() {
+      const canvas = document.getElementById('gameCanvas');
+      const ctx = canvas.getContext('2d');
+      const W = LOGICAL_W;
+      const H = LOGICAL_H;
+
+      ctx.save();
+      ctx.setTransform(canvasScale, 0, 0, canvasScale, 0, 0);
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+
+      // 1. Piso da Floricultura
+      ctx.fillStyle = '#f5e8d7';
+      ctx.fillRect(0, 0, W, H);
+
+      ctx.strokeStyle = '#ead8c0';
+      ctx.lineWidth = 1;
+      for (let x = 0; x < W; x += 48) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+      }
+      for (let y = 0; y < H; y += 48) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+      }
+
+      // Área dos clientes (inferior)
+      ctx.fillStyle = '#ead5c3';
+      ctx.fillRect(0, 362, W, H - 362);
+
+      // Tapete de Entrada
+      ctx.fillStyle = '#d98880';
+      ctx.fillRect(480, H - 20, 160, 18);
+      ctx.strokeStyle = '#922b21';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(480, H - 20, 160, 18);
+      ctx.fillStyle = '#fff';
+      ctx.font = '800 11px "Nunito", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('PORTA DOS CLIENTES', 560, H - 7);
+
+      // 2. Bancadas das Paredes (Norte, Oeste, Leste)
+      ctx.fillStyle = '#8c5a3c';
+      ctx.strokeStyle = '#4f301d';
+      ctx.lineWidth = 3;
+      ctx.fillRect(125, 10, 710, 68);
+      ctx.strokeRect(125, 10, 710, 68);
+      ctx.fillRect(10, 80, 114, 236);
+      ctx.strokeRect(10, 80, 114, 236);
+      ctx.fillRect(W - 124, 80, 114, 236);
+      ctx.strokeRect(W - 124, 80, 114, 236);
+
+      // 3. Os 10 Vasos de Flores (Com ilustrações vetoriais Ultra-HD e rótulos grandes de alta leitura!)
+      FLOWERS.forEach(flower => {
+        const cat = CATEGORIES[flower.category];
+        const isNear = state.nearbyInteractable &&
+                       state.nearbyInteractable.kind === 'FLOWER_POT' &&
+                       state.nearbyInteractable.data.id === flower.id;
+
+        ctx.save();
+        const isPinged = state.pingedFlowerId === flower.id;
+        if (isPinged) {
+          ctx.beginPath();
+          ctx.arc(flower.x, flower.y, 37, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(41, 128, 185, 0.35)';
+          ctx.fill();
+          ctx.strokeStyle = '#2980b9';
+          ctx.lineWidth = 3.5;
+          ctx.stroke();
+        }
+        if (isNear) {
+          ctx.beginPath();
+          ctx.arc(flower.x, flower.y, 34, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(241, 196, 15, 0.48)';
+          ctx.fill();
+          ctx.strokeStyle = '#f39c12';
+          ctx.lineWidth = 3;
+          ctx.stroke();
+        }
+
+        ctx.beginPath();
+        ctx.arc(flower.x, flower.y, 25, 0, Math.PI * 2);
+        ctx.fillStyle = cat.bgSoft;
+        ctx.fill();
+        ctx.strokeStyle = cat.hex;
+        ctx.lineWidth = 4;
+        ctx.stroke();
+
+        // Desenha a flor em vetor nítido no centro do vaso
+        drawVectorFlower(ctx, flower.id, flower.x, flower.y, 1.25);
+
+        if (isPinged) {
+          ctx.font = '800 11px "Nunito", sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillStyle = '#1f618d';
+          ctx.beginPath();
+          ctx.roundRect(flower.x - 42, flower.y - 40, 84, 17, 5);
+          ctx.fill();
+          ctx.fillStyle = '#fff';
+          ctx.fillText('📌 MARCADA!', flower.x, flower.y - 31);
+        }
+
+        ctx.font = '800 13.5px "Nunito", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        const labelW = ctx.measureText(flower.name).width + 14;
+        const labelY = flower.y + 32;
+        ctx.fillStyle = 'rgba(38, 23, 14, 0.96)';
+        ctx.strokeStyle = 'rgba(212, 163, 115, 0.75)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.roundRect(flower.x - labelW / 2, labelY - 11, labelW, 22, 6);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(flower.name, flower.x, labelY + 0.5);
+        ctx.restore();
+      });
+
+      // 4. Balcão Central de Atendimento (Com Lixeira, Mesa de Montagem e as 3 Posições de Clientes)
+      ctx.fillStyle = '#6e472b';
+      ctx.strokeStyle = '#3d2b1f';
+      ctx.lineWidth = 3;
+      ctx.fillRect(122, 311, 712, 50);
+      ctx.strokeRect(122, 311, 712, 50);
+
+      const maxSlots = getMaxSimultaneousSlots();
+
+      COUNTER_STATIONS.forEach(st => {
+        const isNear = state.nearbyInteractable &&
+                       state.nearbyInteractable.data &&
+                       state.nearbyInteractable.data.id === st.id;
+
+        const boxW = st.type === 'TRASH' ? 112 : 132;
+        const halfW = boxW / 2;
+
+        ctx.save();
+        if (isNear) {
+          ctx.fillStyle = 'rgba(241, 196, 15, 0.45)';
+          ctx.beginPath();
+          ctx.roundRect(st.x - halfW - 6, st.y - 26, boxW + 12, 52, 10);
+          ctx.fill();
+          ctx.strokeStyle = '#f1c40f';
+          ctx.lineWidth = 3;
+          ctx.stroke();
+        }
+
+        if (st.type === 'CUSTOMER_SLOT') {
+          const slot = state.customerSlots[st.slotIndex];
+          const isUnlocked = st.slotIndex < maxSlots;
+          const hasCustomer = isUnlocked && slot && slot.order && (slot.state === 'WAITING' || slot.state === 'ENTERING');
+          ctx.fillStyle = !isUnlocked ? '#d5ccc2' : (hasCustomer ? '#d4efdf' : '#f2e9de');
+        } else {
+          ctx.fillStyle = st.type === 'BOUQUET_TABLE' ? '#fff9f0' : '#fadbd8';
+        }
+
+        ctx.strokeStyle = '#3d2b1f';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.roundRect(st.x - halfW, st.y - 20, boxW, 40, 8);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        if (st.type === 'BOUQUET_TABLE') {
+          if (state.tableBouquet.length === 0) {
+            ctx.fillStyle = '#e86f88';
+            ctx.beginPath(); ctx.arc(st.x - 44, st.y, 6.5, 0, Math.PI * 2); ctx.fill();
+            ctx.font = '800 13px "Nunito", sans-serif';
+            ctx.fillStyle = '#5c381e';
+            ctx.fillText('Montar (0/2)', st.x + 8, st.y + 0.5);
+          } else {
+            const count = state.tableBouquet.length;
+            state.tableBouquet.forEach((f, idx) => {
+              const offsetX = count === 1 ? 0 : (idx === 0 ? -18 : 18);
+              drawVectorFlower(ctx, f.id, st.x + offsetX, st.y - 5, 0.85);
+            });
+            ctx.font = '800 11.5px "Nunito", sans-serif';
+            ctx.fillStyle = count === 2 ? '#145a32' : '#7d6608';
+            ctx.fillText(count === 2 ? 'Buquê Pronto (2/2)' : '(1/2 na mesa)', st.x, st.y + 13);
+          }
+        } else if (st.type === 'TRASH') {
+          ctx.fillStyle = '#7f8c8d';
+          ctx.fillRect(st.x - 35, st.y - 5, 12, 13);
+          ctx.fillStyle = '#566573';
+          ctx.fillRect(st.x - 37, st.y - 8, 16, 3);
+          ctx.font = '800 13.5px "Nunito", sans-serif';
+          ctx.fillStyle = '#3d2b1f';
+          ctx.fillText('Lixeira', st.x + 8, st.y + 0.5);
+        } else if (st.type === 'CUSTOMER_SLOT') {
+          const slot = state.customerSlots[st.slotIndex];
+          const isUnlocked = st.slotIndex < maxSlots;
+
+          if (!isUnlocked) {
+            ctx.font = '800 12px "Nunito", sans-serif';
+            ctx.fillStyle = '#6e5a49';
+            ctx.fillText('Pos. #3 (Dia 2+)', st.x, st.y + 0.5);
+          } else if (slot && slot.order && (slot.state === 'WAITING' || slot.state === 'ENTERING')) {
+            const reqLen = slot.order.requirements.length;
+            // Sino dourado + número do cliente
+            ctx.fillStyle = '#f39c12';
+            ctx.beginPath(); ctx.arc(st.x - 44, st.y - 2, 7, Math.PI, 0); ctx.fill();
+            ctx.fillStyle = '#b9770e';
+            ctx.fillRect(st.x - 52, st.y - 2, 16, 2.5);
+
+            ctx.font = '800 13px "Nunito", sans-serif';
+            ctx.fillStyle = '#145a32';
+            ctx.fillText(`Entregar #${st.slotIndex + 1}`, st.x + 8, st.y - 5);
+
+            ctx.font = '800 11px "Nunito", sans-serif';
+            ctx.fillStyle = '#196f3d';
+            ctx.fillText(reqLen === 1 ? '(Pede 1 flor)' : '(Pede 2 flores)', st.x + 6, st.y + 10);
+          } else {
+            ctx.font = '800 12px "Nunito", sans-serif';
+            ctx.fillStyle = '#8c6d53';
+            ctx.fillText(`Balcão #${st.slotIndex + 1} Livre`, st.x, st.y + 0.5);
+          }
+        }
+        ctx.restore();
+      });
+
+      // 5. Desenha o Boneco do Jogador (Florista que gira na direção do movimento)
+      const p = state.player;
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(p.x, p.y + 4, p.radius + 2, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(0,0,0,0.16)';
+      ctx.fill();
+
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.facingAngle);
+
+      ctx.beginPath();
+      ctx.roundRect(-12, -21, 24, 42, 11);
+      ctx.fillStyle = netState.myColor || '#27ae60';
+      ctx.fill();
+      ctx.strokeStyle = '#196f3d';
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+
+      ctx.fillStyle = '#f5cba7';
+      ctx.strokeStyle = '#3d2b1f';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(14, -12, 5.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.arc(14, 12, 5.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(0, 0, 15, 0, Math.PI * 2);
+      ctx.fillStyle = '#f5cba7';
+      ctx.fill();
+      ctx.strokeStyle = '#3d2b1f';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      ctx.fillStyle = '#2c3e50';
+      ctx.beginPath();
+      ctx.arc(8, -5, 2.2, 0, Math.PI * 2);
+      ctx.arc(8, 5, 2.2, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#d4a373';
+      ctx.beginPath();
+      ctx.ellipse(5, 0, 9, 12, 0, -Math.PI / 2, Math.PI / 2);
+      ctx.fill();
+      ctx.strokeStyle = '#6e472b';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(-3, 0, 12, 0, Math.PI * 2);
+      ctx.fillStyle = '#6e472b';
+      ctx.fill();
+
+      if (p.heldFlower) {
+        ctx.save();
+        ctx.translate(25, 0);
+        ctx.rotate(-p.facingAngle);
+        ctx.beginPath();
+        ctx.arc(0, 0, 15, 0, Math.PI * 2);
+        ctx.fillStyle = '#fff';
+        ctx.fill();
+        ctx.strokeStyle = '#f39c12';
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+        drawVectorFlower(ctx, p.heldFlower.id, 0, 0, 0.85);
+        ctx.restore();
+      }
+      ctx.restore();
+
+      ctx.font = '800 13px "Nunito", sans-serif';
+      ctx.fillStyle = '#3d2b1f';
+      ctx.textAlign = 'center';
+      ctx.fillText(netState.myLabel || 'VOCÊ (P1)', p.x, p.y - 25);
+      ctx.restore();
+
+      // 5B. Desenha o Parceiro Bot IA (se ativo) E todos os Jogadores Remotos P2P (PeerJS) conectados na sala!
+      const extraPlayers = [];
+      if (state.coopEnabled && netState.mode !== 'CLIENT') {
+        extraPlayers.push({
+          x: state.coopPartner.x,
+          y: state.coopPartner.y,
+          facingAngle: state.coopPartner.facingAngle,
+          heldFlower: state.coopPartner.heldFlower,
+          color: '#2980b9',
+          label: '🤖 BOT (P2)'
+        });
+      }
+      netState.remotePlayers.forEach(rp => extraPlayers.push(rp));
+
+      extraPlayers.forEach(bot => {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(bot.x, bot.y + 4, bot.radius + 2, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(0,0,0,0.16)';
+        ctx.fill();
+
+        ctx.save();
+        ctx.translate(bot.x, bot.y);
+        ctx.rotate(bot.facingAngle);
+
+        ctx.beginPath();
+        ctx.roundRect(-12, -21, 24, 42, 11);
+        ctx.fillStyle = bot.color || '#2980b9';
+        ctx.fill();
+        ctx.strokeStyle = '#1b4f72';
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+
+        ctx.fillStyle = '#f5cba7';
+        ctx.strokeStyle = '#3d2b1f';
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(14, -12, 5.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.arc(14, 12, 5.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(0, 0, 15, 0, Math.PI * 2);
+        ctx.fillStyle = '#f5cba7';
+        ctx.fill();
+        ctx.strokeStyle = '#3d2b1f';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        ctx.fillStyle = '#2c3e50';
+        ctx.beginPath();
+        ctx.arc(3, -1, 11, Math.PI * 0.5, Math.PI * 1.5);
+        ctx.fill();
+
+        if (bot.heldFlower) {
+          ctx.save();
+          ctx.translate(25, 0);
+          ctx.rotate(-bot.facingAngle);
+          ctx.beginPath();
+          ctx.arc(0, 0, 15, 0, Math.PI * 2);
+          ctx.fillStyle = '#fff';
+          ctx.fill();
+          ctx.strokeStyle = '#2980b9';
+          ctx.lineWidth = 2.5;
+          ctx.stroke();
+          drawVectorFlower(ctx, bot.heldFlower.id, 0, 0, 0.85);
+          ctx.restore();
+        }
+        ctx.restore();
+
+        ctx.font = '800 12.5px "Nunito", sans-serif';
+        ctx.fillStyle = '#1b4f72';
+        ctx.textAlign = 'center';
+        ctx.fillText(bot.label || '🤝 AMIGO (P2)', bot.x, bot.y - 25);
+        ctx.restore();
+      });
+
+      // 6. Balão Contextual de Interação
+      if (state.nearbyInteractable) {
+        const nb = state.nearbyInteractable;
+        let promptText = '';
+        if (nb.kind === 'FLOWER_POT') {
+          promptText = `[Pegar] ${nb.data.name}`;
+        } else if (nb.kind === 'BOUQUET_TABLE') {
+          if (p.heldFlower) {
+            promptText = state.tableBouquet.length < 2
+              ? `[Colocar] ${p.heldFlower.name} na Mesa (${state.tableBouquet.length}/2)`
+              : `[Trocar] 2ª flor por ${p.heldFlower.name}`;
+          } else {
+            promptText = state.tableBouquet.length > 0
+              ? `[Retirar] última flor da Mesa`
+              : `Traga até 2 flores para montar buquê!`;
+          }
+        } else if (nb.kind === 'CUSTOMER_SLOT') {
+          const sIdx = nb.data.slotIndex;
+          const slot = state.customerSlots[sIdx];
+          if (sIdx >= maxSlots) {
+            promptText = `Posição #3 abre no Dia 2!`;
+          } else if (!slot || !slot.order || (slot.state !== 'WAITING' && slot.state !== 'ENTERING')) {
+            promptText = `Aguardando cliente na Posição #${sIdx + 1}...`;
+          } else {
+            const reqLen = slot.order.requirements.length;
+            const cName = slot.order.customerName;
+            if (reqLen === 1) {
+              if (p.heldFlower) {
+                promptText = `[Entregar] ${p.heldFlower.name} para #${sIdx + 1} ${cName}!`;
+              } else if (state.tableBouquet.length === 1) {
+                promptText = `[Entregar] ${state.tableBouquet[0].name} da Mesa para #${sIdx + 1} ${cName}!`;
+              } else {
+                promptText = `#${sIdx + 1} ${cName} pediu 1 flor (Traga na mão!)`;
+              }
+            } else {
+              if (state.tableBouquet.length === 2) {
+                promptText = `[Entregar] Buquê (2/2) para #${sIdx + 1} ${cName}!`;
+              } else {
+                promptText = `#${sIdx + 1} ${cName} pediu 2 flores: monte na Mesa (${state.tableBouquet.length}/2)`;
+              }
+            }
+          }
+        } else if (nb.kind === 'TRASH') {
+          promptText = p.heldFlower ? `[Jogar fora] ${p.heldFlower.name}` : `[Limpar] Mesa de Montagem`;
+        }
+
+        if (promptText) {
+          ctx.save();
+          ctx.font = '800 13px "Nunito", sans-serif';
+          const tw = ctx.measureText(promptText).width + 20;
+          const px = Math.max(tw / 2 + 10, Math.min(W - tw / 2 - 10, p.x));
+          const py = p.y - 44;
+
+          ctx.fillStyle = '#26170e';
+          ctx.beginPath();
+          ctx.roundRect(px - tw / 2, py - 13, tw, 25, 8);
+          ctx.fill();
+          ctx.strokeStyle = '#f1c40f';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+
+          ctx.fillStyle = '#fff';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(promptText, px, py - 0.5);
+          ctx.restore();
+        }
+      }
+
+      // 7. Os Clientes (NPCs) em frente ao Balcão (Até 3 Simultâneos com barra de paciência individual!)
+      state.customerSlots.forEach((slot, idx) => {
+        if (slot.state === 'EMPTY' || !slot.order) return;
+
+        ctx.save();
+        // Corpo/ombros do cliente
+        ctx.fillStyle = slot.order.color;
+        ctx.beginPath();
+        ctx.roundRect(slot.x - 22, slot.y - 12, 44, 24, 10);
+        ctx.fill();
+        ctx.strokeStyle = '#2c3e50';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Cabeça
+        ctx.beginPath();
+        ctx.arc(slot.x, slot.y, 14.5, 0, Math.PI * 2);
+        ctx.fillStyle = '#fad7a0';
+        ctx.fill();
+        ctx.stroke();
+
+        // Plaquinha com Nome + Barra de Paciência em tempo real logo abaixo do cliente
+        const labelText = `#${idx + 1} ${slot.order.customerName}`;
+        ctx.font = '800 12.5px "Nunito", sans-serif';
+        const nameW = Math.max(82, ctx.measureText(labelText).width + 14);
+        const boxY = slot.y + 20;
+
+        ctx.fillStyle = 'rgba(38, 23, 14, 0.92)';
+        ctx.beginPath();
+        ctx.roundRect(slot.x - nameW / 2, boxY, nameW, 28, 6);
+        ctx.fill();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(labelText, slot.x, boxY + 10);
+
+        // Mini Barra de Paciência dentro da plaquinha do cliente
+        const barW = nameW - 12;
+        const barX = slot.x - barW / 2;
+        const barY = boxY + 20;
+        const pct = Math.max(0, Math.min(1, slot.patienceLeft / slot.patienceMax));
+
+        ctx.fillStyle = '#4a3525';
+        ctx.fillRect(barX, barY, barW, 5);
+
+        ctx.fillStyle = pct >= 0.5 ? '#2ecc71' : (pct >= 0.22 ? '#f1c40f' : '#e74c3c');
+        ctx.fillRect(barX, barY, barW * pct, 5);
+
+        // Divisor da Fase Verde (50%)
+        ctx.fillStyle = 'rgba(255,255,255,0.65)';
+        ctx.fillRect(barX + barW * 0.5, barY, 1.5, 5);
+
+        if (slot.reactionEmoji) {
+          ctx.font = '20px sans-serif';
+          ctx.fillText(slot.reactionEmoji, slot.x, slot.y - 24);
+        }
+        ctx.restore();
+      });
+
+      ctx.restore();
+    }
+
+    /**************************************************************
+     * 9. INTERFACE MULTI-CLIENTES, ENCICLOPÉDIA EM CARDS E MODAIS
+     **************************************************************/
+    function updateOrderBannerUI() {
+      const container = document.getElementById('multiOrdersContainer');
+      const maxSlots = getMaxSimultaneousSlots();
+      let html = '';
+      let encycReminders = [];
+
+      for (let i = 0; i < maxSlots; i++) {
+        const slot = state.customerSlots[i];
+        if (slot && slot.order && (slot.state === 'WAITING' || slot.state === 'ENTERING')) {
+          const ord = slot.order;
+          const pct = Math.max(0, (slot.patienceLeft / slot.patienceMax) * 100);
+          const barCol = pct >= 50 ? '#2ecc71' : (pct >= 22 ? '#f1c40f' : '#e74c3c');
+          const timeCol = pct >= 50 ? '#1e8449' : (pct >= 22 ? '#b7950b' : '#c0392b');
+          const urgentClass = pct < 22 ? 'urgent-slot' : '';
+
+          const typeLabel = ord.type === 1 ? 'T1: Decidido' : (ord.type === 2 ? 'T2: Indeciso' : 'T3: Misto');
+          const typeClass = `type-${ord.type}`;
+
+          html += `
+            <div class="customer-order-card ${urgentClass}" id="orderCard_${i}" onclick="walkAndInteractCustomerSlot(${i})" title="Toque para ir entregar ao Cliente #${i + 1}">
+              <div class="order-customer-top">
+                <div style="display:flex; align-items:center; gap:4px; min-width:0; overflow:hidden;">
+                  <span class="slot-num-badge" style="background:${ord.color};">#${i + 1}</span>
+                  <span style="overflow:hidden; text-overflow:ellipsis;">${ord.customerName}</span>
+                  <span class="type-badge ${typeClass}">${typeLabel}</span>
+                </div>
+                <div style="display:flex; align-items:center; gap:5px; flex-shrink:0;">
+                  <span id="patienceTime_${i}" style="color:${timeCol}; font-size:0.75rem;">${Math.ceil(slot.patienceLeft)}s</span>
+                  <div class="patience-bar-outer" title="Direita: Fase Verde (+$10 Gorjeta)">
+                    <div class="patience-bar-inner" id="patienceBar_${i}" style="width:${pct}%; background-color:${barCol};"></div>
+                  </div>
+                </div>
+              </div>
+              <div class="order-speech-text">${ord.dialogueHTML}</div>
+            </div>
+          `;
+
+          encycReminders.push(`<span><strong>#${i + 1} ${ord.customerName}:</strong> ${ord.dialogueHTML}</span>`);
+        } else {
+          html += `
+            <div class="customer-order-card empty-slot">
+              <span>⏳ Balcão #${i + 1}: Aguardando cliente...</span>
+            </div>
+          `;
+        }
+      }
+
+      container.innerHTML = html;
+
+      const reminderEl = document.getElementById('encycOrderReminder');
+      if (encycReminders.length > 0) {
+        reminderEl.innerHTML = `💬 <strong>Pedidos no Balcão:</strong> ` + encycReminders.join(' &nbsp;|&nbsp; ');
+      } else {
+        reminderEl.innerHTML = `💬 <strong>Aguardando novos clientes entrarem na loja...</strong>`;
+      }
+
+      const handEl = document.getElementById('hudHandItem');
+      handEl.innerHTML = state.player.heldFlower
+        ? `${state.player.heldFlower.emoji} ${state.player.heldFlower.name}`
+        : 'Vazia';
+
+      const tableEl = document.getElementById('hudTableBouquet');
+      if (state.tableBouquet.length === 0) {
+        tableEl.textContent = `0/2`;
+      } else {
+        tableEl.innerHTML = `${state.tableBouquet.map(f => f.emoji).join('+')} (${state.tableBouquet.length}/2)`;
+      }
+    }
+
+    function updatePatienceBarsInDOM() {
+      const maxSlots = getMaxSimultaneousSlots();
+      for (let i = 0; i < maxSlots; i++) {
+        const slot = state.customerSlots[i];
+        if (!slot || !slot.order || slot.state !== 'WAITING') continue;
+        const bar = document.getElementById(`patienceBar_${i}`);
+        const txt = document.getElementById(`patienceTime_${i}`);
+        const card = document.getElementById(`orderCard_${i}`);
+        if (!bar || !txt) continue;
+
+        const pct = Math.max(0, (slot.patienceLeft / slot.patienceMax) * 100);
+        bar.style.width = `${pct}%`;
+        txt.textContent = `${Math.ceil(slot.patienceLeft)}s`;
+
+        if (pct >= 50) {
+          bar.style.backgroundColor = '#2ecc71';
+          txt.style.color = '#1e8449';
+          if (card) card.classList.remove('urgent-slot');
+        } else if (pct >= 22) {
+          bar.style.backgroundColor = '#f1c40f';
+          txt.style.color = '#b7950b';
+          if (card) card.classList.remove('urgent-slot');
+        } else {
+          bar.style.backgroundColor = '#e74c3c';
+          txt.style.color = '#c0392b';
+          if (card) card.classList.add('urgent-slot');
+        }
+      }
+    }
+
+    function toggleEncyclopedia() {
+      document.getElementById('encycModal').classList.toggle('active');
+    }
+
+    function toggleDebugDrawer() {
+      document.getElementById('debugDrawer').classList.toggle('active');
+    }
+
+    function renderEncyclopedia(filterCat = 'ALL') {
+      const grid = document.getElementById('encyclopediaCardsGrid');
+      grid.innerHTML = '';
+
+      const list = filterCat === 'ALL'
+        ? FLOWERS
+        : FLOWERS.filter(f => f.category === filterCat);
+
+      list.forEach(flower => {
+        const cat = CATEGORIES[flower.category];
+        const card = document.createElement('div');
+        card.className = 'encyc-card';
+        const occasionsBadges = cat.occasions.map(o => `<span class="occ-tag">${o}</span>`).join('');
+
+        card.innerHTML = `
+          <div class="encyc-card-top">
+            <div style="display:flex; align-items:center; gap:6px; font-weight:800; font-size:0.95rem;">
+              <span style="font-size:1.4rem;">${flower.emoji}</span>
+              <span>${flower.name}</span>
+            </div>
+            <span style="padding:2px 8px; border-radius:99px; font-size:0.7rem; font-weight:800; background:${cat.bgSoft}; color:${cat.textCol};">
+              ${cat.name}
+            </span>
+          </div>
+          <div style="font-size:0.76rem; color:#666;"><strong>Sentimento:</strong> ${cat.sentiment}</div>
+          <div>${occasionsBadges}</div>
+          <button onclick="pingFlowerFromEncyclopedia('${flower.id}')" style="margin-top:4px; border:none; background:#2980b9; color:#fff; border-radius:7px; padding:5px 8px; font-family:'Fredoka',sans-serif; font-size:0.76rem; font-weight:600; cursor:pointer;">
+            📌 Marcar na Loja / Pedir no Co-op
+          </button>
+        `;
+        grid.appendChild(card);
+      });
+    }
+
+    function pingFlowerFromEncyclopedia(flowerId) {
+      const fl = FLOWERS.find(f => f.id === flowerId);
+      if (!fl) return;
+      state.pingedFlowerId = flowerId;
+      document.getElementById('encycModal').classList.remove('active');
+      playSound('pick');
+
+      if (netState.mode === 'CLIENT' && netState.hostConn && netState.hostConn.open) {
+        netState.hostConn.send({ type: 'PING', flowerId });
+        showToast(`📌 Você marcou ${fl.name} para a equipe!`, '#2980b9');
+      } else if (netState.mode === 'HOST') {
+        broadcastToast(`📌 Host marcou ${fl.name} no mapa!`, '#2980b9', 'pick');
+        broadcastHostState();
+      } else if (state.coopEnabled) {
+        showToast(`📌 ${fl.name} marcada! Seu Bot (P2) já foi buscar!`, '#2980b9');
+      } else {
+        showToast(`📌 ${fl.name} destacada no mapa da loja!`, '#2980b9');
+      }
+    }
+
+    function toggleCoopMode() {
+      ensureAudioContext();
+      state.coopEnabled = !state.coopEnabled;
+      updateCoopTopButton();
+
+      if (state.coopEnabled) {
+        state.coopPartner.x = 360;
+        state.coopPartner.y = 220;
+        state.coopPartner.heldFlower = null;
+        state.coopPartner.task = null;
+        if (state.customerSlots[2].state === 'EMPTY' && state.customersSpawnedInDay < state.customersPerDay) {
+          state.customerSlots[2].spawnCooldown = 1.2;
+        }
+        showToast('🤖 Parceiro Bot IA Ativado!', '#27ae60');
+      } else {
+        showToast('🤖 Parceiro Bot IA Desativado.', '#7f8c8d');
+      }
+      updateOrderBannerUI();
+    }
+
+    function filterEncyclopedia(catId, btnEl) {
+      document.querySelectorAll('.encyc-tab').forEach(b => b.classList.remove('active'));
+      if (btnEl) btnEl.classList.add('active');
+      renderEncyclopedia(catId);
+    }
+
+    function updateHUD() {
+      document.getElementById('hudMoney').textContent = `$${state.money}`;
+      document.getElementById('hudDay').textContent = state.day;
+      document.getElementById('hudCustomers').textContent = `${state.customersServedInDay}/${state.customersPerDay}`;
+      document.getElementById('hudScore').textContent = state.totalHits;
+
+      const moneyPill = document.getElementById('moneyPill');
+      if (state.money <= 35) moneyPill.classList.add('low-money');
+      else moneyPill.classList.remove('low-money');
+    }
+
+    function showToast(text, bgColor) {
+      const overlay = document.getElementById('feedbackOverlay');
+      const toast = document.createElement('div');
+      toast.className = 'toast-msg';
+      toast.style.background = bgColor;
+      toast.textContent = text;
+      overlay.appendChild(toast);
+      setTimeout(() => toast.remove(), 2100);
+    }
+
+    function triggerEndOfDay() {
+      state.gameActive = false;
+      document.getElementById('encycModal').classList.remove('active');
+      const modal = document.getElementById('gameModal');
+      document.getElementById('modalIcon').textContent = '🌻';
+      document.getElementById('modalTitle').textContent = `Fim do Dia ${state.day}!`;
+      document.getElementById('modalDesc').textContent = 'Resumo do expediente na floricultura:';
+
+      document.getElementById('modalStats').innerHTML = `
+        <div style="display:flex; justify-content:space-between; font-weight:700; margin-bottom:4px;"><span>✅ Pedidos Acertados:</span><span>${state.dayHits}</span></div>
+        <div style="display:flex; justify-content:space-between; font-weight:700; margin-bottom:4px;"><span>⚡ Gorjetas Rápidas:</span><span style="color:#27ae60;">+$${state.dayTips}</span></div>
+        <div style="display:flex; justify-content:space-between; font-weight:700; margin-bottom:4px;"><span>❌ Erros:</span><span style="color:#c0392b;">${state.dayErrors}</span></div>
+        <div style="display:flex; justify-content:space-between; font-weight:700; margin-bottom:6px;"><span>⌛ Saídas por demora:</span><span style="color:#e67e22;">${state.dayWalkouts}</span></div>
+        <hr style="border:none; border-top:1px solid #d5c3b0; margin:6px 0;">
+        <div style="display:flex; justify-content:space-between; font-weight:800; font-size:1.05rem;"><span>💰 Saldo em Caixa:</span><span style="color:#27ae60;">$${state.money}</span></div>
+      `;
+
+      const btn = document.getElementById('modalBtn');
+      btn.textContent = `▶️ Iniciar Dia ${state.day + 1}`;
+      btn.dataset.action = 'NEXT_DAY';
+      modal.classList.add('active');
+    }
+
+    function triggerBankruptcy() {
+      state.gameActive = false;
+      document.getElementById('encycModal').classList.remove('active');
+      const modal = document.getElementById('gameModal');
+      document.getElementById('modalIcon').textContent = '💸';
+      document.getElementById('modalTitle').textContent = 'GAME OVER — Falência!';
+      document.getElementById('modalDesc').textContent = 'O saldo chegou a $0 e a floricultura fechou as portas.';
+
+      document.getElementById('modalStats').innerHTML = `
+        <div style="display:flex; justify-content:space-between; font-weight:700; margin-bottom:4px;"><span>📅 Dias Sobrevividos:</span><span>${state.day}</span></div>
+        <div style="display:flex; justify-content:space-between; font-weight:700; margin-bottom:4px;"><span>💐 Clientes Atendidos:</span><span>${state.totalHits}</span></div>
+        <div style="display:flex; justify-content:space-between; font-weight:800;"><span>💰 Saldo Final:</span><span style="color:#c0392b;">$0</span></div>
+      `;
+
+      const btn = document.getElementById('modalBtn');
+      btn.textContent = '🔄 Recomeçar Jogo ($100)';
+      btn.dataset.action = 'RESTART';
+      modal.classList.add('active');
+    }
+
+    function handleModalAction() {
+      const btn = document.getElementById('modalBtn');
+      document.getElementById('gameModal').classList.remove('active');
+      if (btn.dataset.action === 'NEXT_DAY') {
+        state.day++;
+        state.dayHits = 0;
+        state.dayErrors = 0;
+        state.dayWalkouts = 0;
+        state.dayTips = 0;
+        state.tableBouquet = [];
+        state.gameActive = true;
+        initDayCustomers();
+      } else {
+        resetGame();
+      }
+    }
+
+    function forceCustomerType(typeNum) {
+      state.gameActive = true;
+      document.getElementById('gameModal').classList.remove('active');
+      document.getElementById('debugDrawer').classList.remove('active');
+
+      const maxSlots = getMaxSimultaneousSlots();
+      let targetSlot = state.customerSlots.findIndex((s, idx) => idx < maxSlots && s.state === 'EMPTY');
+      if (targetSlot === -1) targetSlot = 0; // Se todos estiverem ocupados, substitui na Posição #1
+
+      spawnCustomerInSlot(targetSlot, typeNum);
+      showToast(`🛠️ Cliente Tipo ${typeNum} chamado no Balcão #${targetSlot + 1}!`, '#2c3e50');
+    }
+
+    function fillAllThreeSlots() {
+      state.forceThreeSlots = true;
+      state.gameActive = true;
+      document.getElementById('gameModal').classList.remove('active');
+      document.getElementById('debugDrawer').classList.remove('active');
+
+      for (let i = 0; i < 3; i++) {
+        if (state.customerSlots[i].state === 'EMPTY') {
+          spawnCustomerInSlot(i);
+        }
+      }
+      updateOrderBannerUI();
+      showToast('👥 3 Clientes simultâneos no balcão!', '#1f618d');
+    }
+
+    function adjustMoney(delta) {
+      state.money = Math.max(0, state.money + delta);
+      updateHUD();
+      document.getElementById('debugDrawer').classList.remove('active');
+      if (state.money <= 0) triggerBankruptcy();
+      else showToast(`💸 Saldo ajustado em ${delta}`, '#c0392b');
+    }
+
+    function togglePauseTimer() {
+      state.timerPaused = !state.timerPaused;
+      const btn = document.getElementById('btnPauseTimer');
+      btn.textContent = state.timerPaused ? '▶️ Retomar Tempo' : '⏸️ Pausar Tempo';
+      document.getElementById('debugDrawer').classList.remove('active');
+    }
+
+    function resetGame() {
+      state.money = 100;
+      state.day = 1;
+      state.forceThreeSlots = false;
+      state.totalHits = 0;
+      state.dayHits = 0;
+      state.dayErrors = 0;
+      state.dayWalkouts = 0;
+      state.dayTips = 0;
+      state.player.x = 480;
+      state.player.y = 220;
+      state.player.heldFlower = null;
+      state.tableBouquet = [];
+      state.gameActive = true;
+      document.getElementById('gameModal').classList.remove('active');
+      document.getElementById('debugDrawer').classList.remove('active');
+      initDayCustomers();
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      setupHiDPICanvas();
+      if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(setupHiDPICanvas);
+      }
+      renderTutorialSlide();
+      renderEncyclopedia('ALL');
+      initDayCustomers();
+      requestAnimationFrame(gameLoop);
+    });
+  </script>
+</body>
+</html>
