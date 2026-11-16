@@ -2340,6 +2340,9 @@
         state.dayHits++;
         if (speedTip > 0) state.dayTips += speedTip;
 
+        slot.state = 'LEAVING_HAPPY';
+        slot.reactionEmoji = '😍💐';
+
         const tipText = speedTip > 0 ? ` (+$${speedTip} Gorjeta!)` : '';
         broadcastToast(`✅ #${slotIndex + 1} ${ord.customerName}: +$${totalEarned}${tipText}`, '#27ae60', 'success');
       } else if (evalResult.matchedCount > 0) {
