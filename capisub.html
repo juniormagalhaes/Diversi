@@ -566,6 +566,7 @@
 
       <div class="hud-right-cluster">
         <button class="glass-btn" id="btnMusic" onclick="toggleSound()">🎵 Som</button>
+        <button class="glass-btn" id="btnFullscreen" onclick="toggleFullScreen()" title="Tela Cheia">⛶ Tela</button>
         <button class="glass-btn" onclick="toggleDebugDrawer()">⚙️ Demo</button>
         <button class="pause-square-btn" onclick="openHelpModal()" title="Pausar / Como Jogar">
           <span class="pause-bar"></span>
@@ -604,14 +605,14 @@
 
       <!-- Botões Circulares Translúcidos à Direita (Idêntico ao botão circular de ação da imagem!) -->
       <div class="right-action-cluster">
-        <button class="action-circle-btn small" onclick="triggerCapiDash()" title="Capi-Dash (Espaço / Botão Direito)">
+        <button class="action-circle-btn small" id="dashBtn" title="Capi-Dash (Espaço / Botão Direito)">
           <div class="action-circle-inner">
             <span style="font-size:1.2rem;">💨</span>
             <span>DASH</span>
           </div>
         </button>
-        <button class="action-circle-btn" onclick="fireOrReleaseHarpoon()" title="Disparar / Recolher Arpão com Corda">
-          <div class="action-circle-inner">
+        <button class="action-circle-btn" id="harpoonStickBtn" title="Arraste para mirar e solte para disparar o Arpão">
+          <div class="action-circle-inner" id="harpoonStickKnob" style="transition: transform 0.1s ease-out;">
             <span style="font-size:1.55rem; color:#4b5563;">⚓</span>
             <span>ARPÃO</span>
           </div>
@@ -905,18 +906,137 @@
       keys[k] = isDown;
     }
 
-    /* JOYSTICK ANALÓGICO VIRTUAL (MOBILE / TOUCH) — arraste o círculo central em qualquer direção (360° + diagonais) */
-    const joy = { active: false, x: 0, y: 0, pointerId: null };
+    /* JOYSTICK ANALÓGICO VIRTUAL + MULTI-TOQUE (MOBILE / TOUCH) — permite andar, mirar/atirar e dar dash ao mesmo tempo */
+    const joy = { active: false, x: 0, y: 0, pointerId: null, touchId: null };
     const joyBase = document.getElementById('joyBase');
     const joyKnob = document.getElementById('joyKnob');
+    let aimMode = 'MOUSE'; // 'MOUSE' | 'SWIM' | 'STICK'
 
-    function updateJoyFromEvent(ev) {
+    /* BOTÃO-ALAVANCA DO ARPÃO (TWIN-STICK MOBILE): arraste para mirar em 360° e solte para disparar */
+    const aimJoy = { active: false, pointerId: null, touchId: null, dragged: false };
+    const harpoonBtn = document.getElementById('harpoonStickBtn');
+    const harpoonKnob = document.getElementById('harpoonStickKnob');
+    const dashBtn = document.getElementById('dashBtn');
+
+    function findTouchById(touchList, id) {
+      for (let i = 0; i < touchList.length; i++) {
+        if (touchList[i].identifier === id) return touchList[i];
+      }
+      return null;
+    }
+
+    function updateAimStickPos(clientX, clientY) {
+      const rect = harpoonBtn.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      const maxR = rect.width * 0.32;
+      let dx = clientX - cx;
+      let dy = clientY - cy;
+      const dist = Math.hypot(dx, dy);
+      if (dist > maxR) { dx = dx / dist * maxR; dy = dy / dist * maxR; }
+      harpoonKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+      if (dist > 7) {
+        aimJoy.dragged = true;
+        aimMode = 'STICK';
+        const ang = Math.atan2(dy, dx);
+        game.capi.aimAngle = ang;
+        game.capi.facingRight = Math.cos(ang) >= 0;
+        mouse.x = Math.max(0, Math.min(W, game.capi.x + Math.cos(ang) * 145));
+        mouse.y = Math.max(0, Math.min(H, game.capi.y + Math.sin(ang) * 145));
+      }
+    }
+
+    function releaseAimStick(shouldFire) {
+      if (!aimJoy.active) return;
+      aimJoy.active = false;
+      aimJoy.pointerId = null;
+      aimJoy.touchId = null;
+      harpoonKnob.style.transition = 'transform 0.1s ease-out';
+      harpoonKnob.style.transform = 'translate(0px, 0px)';
+      if (shouldFire) fireOrReleaseHarpoon();
+      if (aimMode === 'STICK') aimMode = 'SWIM';
+    }
+
+    harpoonBtn.style.touchAction = 'none';
+    harpoonBtn.addEventListener('touchstart', ev => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      ensureAudio();
+      if (aimJoy.touchId === null && ev.changedTouches.length > 0) {
+        const t = ev.changedTouches[0];
+        aimJoy.active = true;
+        aimJoy.dragged = false;
+        aimJoy.touchId = t.identifier;
+        harpoonKnob.style.transition = 'none';
+        updateAimStickPos(t.clientX, t.clientY);
+      }
+    }, { passive: false });
+    harpoonBtn.addEventListener('touchmove', ev => {
+      if (!aimJoy.active || aimJoy.touchId === null) return;
+      const t = findTouchById(ev.changedTouches, aimJoy.touchId) || findTouchById(ev.touches, aimJoy.touchId);
+      if (t) { ev.preventDefault(); updateAimStickPos(t.clientX, t.clientY); }
+    }, { passive: false });
+    harpoonBtn.addEventListener('touchend', ev => {
+      if (aimJoy.touchId !== null && findTouchById(ev.changedTouches, aimJoy.touchId)) {
+        ev.preventDefault();
+        releaseAimStick(true);
+      }
+    }, { passive: false });
+    harpoonBtn.addEventListener('touchcancel', ev => {
+      if (aimJoy.touchId !== null && findTouchById(ev.changedTouches, aimJoy.touchId)) {
+        releaseAimStick(false);
+      }
+    });
+
+    harpoonBtn.addEventListener('pointerdown', ev => {
+      if (ev.pointerType === 'touch') return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      ensureAudio();
+      aimJoy.active = true;
+      aimJoy.dragged = false;
+      aimJoy.pointerId = ev.pointerId;
+      harpoonBtn.setPointerCapture(ev.pointerId);
+      harpoonKnob.style.transition = 'none';
+      updateAimStickPos(ev.clientX, ev.clientY);
+    });
+    harpoonBtn.addEventListener('pointermove', ev => {
+      if (ev.pointerType !== 'touch' && aimJoy.active && ev.pointerId === aimJoy.pointerId) {
+        updateAimStickPos(ev.clientX, ev.clientY);
+      }
+    });
+    harpoonBtn.addEventListener('pointerup', ev => {
+      if (ev.pointerType !== 'touch' && ev.pointerId === aimJoy.pointerId) releaseAimStick(true);
+    });
+    ['pointercancel', 'lostpointercapture'].forEach(type => {
+      harpoonBtn.addEventListener(type, ev => {
+        if (ev.pointerType !== 'touch' && ev.pointerId === aimJoy.pointerId) releaseAimStick(false);
+      });
+    });
+
+    // Botão Dash com suporte imediato a multi-toque e mouse
+    dashBtn.style.touchAction = 'none';
+    dashBtn.addEventListener('touchstart', ev => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      ensureAudio();
+      triggerCapiDash();
+    }, { passive: false });
+    dashBtn.addEventListener('pointerdown', ev => {
+      if (ev.pointerType === 'touch') return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      ensureAudio();
+      triggerCapiDash();
+    });
+
+    function updateJoyPos(clientX, clientY) {
       const rect = joyBase.getBoundingClientRect();
       const cx = rect.left + rect.width / 2;
       const cy = rect.top + rect.height / 2;
       const maxR = rect.width * 0.34;
-      let dx = ev.clientX - cx;
-      let dy = ev.clientY - cy;
+      let dx = clientX - cx;
+      let dy = clientY - cy;
       const dist = Math.hypot(dx, dy);
       if (dist > maxR) { dx = dx / dist * maxR; dy = dy / dist * maxR; }
       joy.x = dx / maxR;
@@ -927,13 +1047,41 @@
     function releaseJoy() {
       joy.active = false;
       joy.pointerId = null;
+      joy.touchId = null;
       joy.x = 0;
       joy.y = 0;
       joyKnob.classList.remove('dragging');
       joyKnob.style.transform = 'translate(0px, 0px)';
     }
 
+    joyBase.addEventListener('touchstart', ev => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      ensureAudio();
+      if (joy.touchId === null && ev.changedTouches.length > 0) {
+        const t = ev.changedTouches[0];
+        joy.active = true;
+        joy.touchId = t.identifier;
+        joyKnob.classList.add('dragging');
+        updateJoyPos(t.clientX, t.clientY);
+      }
+    }, { passive: false });
+    joyBase.addEventListener('touchmove', ev => {
+      if (!joy.active || joy.touchId === null) return;
+      const t = findTouchById(ev.changedTouches, joy.touchId) || findTouchById(ev.touches, joy.touchId);
+      if (t) { ev.preventDefault(); updateJoyPos(t.clientX, t.clientY); }
+    }, { passive: false });
+    ['touchend', 'touchcancel'].forEach(type => {
+      joyBase.addEventListener(type, ev => {
+        if (joy.touchId !== null && findTouchById(ev.changedTouches, joy.touchId)) {
+          ev.preventDefault();
+          releaseJoy();
+        }
+      }, { passive: false });
+    });
+
     joyBase.addEventListener('pointerdown', ev => {
+      if (ev.pointerType === 'touch') return;
       ev.preventDefault();
       ev.stopPropagation();
       ensureAudio();
@@ -941,36 +1089,55 @@
       joy.pointerId = ev.pointerId;
       joyBase.setPointerCapture(ev.pointerId);
       joyKnob.classList.add('dragging');
-      updateJoyFromEvent(ev);
+      updateJoyPos(ev.clientX, ev.clientY);
     });
     joyBase.addEventListener('pointermove', ev => {
-      if (joy.active && ev.pointerId === joy.pointerId) updateJoyFromEvent(ev);
+      if (ev.pointerType !== 'touch' && joy.active && ev.pointerId === joy.pointerId) updateJoyPos(ev.clientX, ev.clientY);
     });
     ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(type => {
       joyBase.addEventListener(type, ev => {
-        if (ev.pointerId === joy.pointerId) releaseJoy();
+        if (ev.pointerType !== 'touch' && ev.pointerId === joy.pointerId) releaseJoy();
       });
     });
 
-    function updateMouseFromEvent(ev) {
+    function updateMouseFromCoords(clientX, clientY) {
       const rect = canvas.getBoundingClientRect();
       const dpr = window.devicePixelRatio || 1;
-      const rawX = (ev.clientX - rect.left) * dpr;
-      const rawY = (ev.clientY - rect.top) * dpr;
+      const rawX = (clientX - rect.left) * dpr;
+      const rawY = (clientY - rect.top) * dpr;
       const offsetX = (canvas.width - W * viewScale) / 2;
       const offsetY = (canvas.height - H * viewScale) / 2;
       mouse.x = Math.max(0, Math.min(W, (rawX - offsetX) / viewScale));
       mouse.y = Math.max(0, Math.min(H, (rawY - offsetY) / viewScale));
     }
 
+    canvas.addEventListener('touchstart', ev => {
+      ev.preventDefault();
+      ensureAudio();
+      document.getElementById('debugDrawer').classList.remove('active');
+      if (ev.changedTouches.length > 0) {
+        const t = ev.changedTouches[0];
+        updateMouseFromCoords(t.clientX, t.clientY);
+        game.capi.aimAngle = Math.atan2(mouse.y - game.capi.y, mouse.x - game.capi.x);
+        aimMode = 'SWIM';
+        fireOrReleaseHarpoon();
+      }
+    }, { passive: false });
+
     canvas.addEventListener('pointermove', ev => {
-      updateMouseFromEvent(ev);
+      if (ev.pointerType === 'mouse') {
+        aimMode = 'MOUSE';
+        updateMouseFromCoords(ev.clientX, ev.clientY);
+      }
     });
 
     canvas.addEventListener('pointerdown', ev => {
+      if (ev.pointerType === 'touch') return;
       ensureAudio();
       document.getElementById('debugDrawer').classList.remove('active');
-      updateMouseFromEvent(ev);
+      updateMouseFromCoords(ev.clientX, ev.clientY);
+      game.capi.aimAngle = Math.atan2(mouse.y - game.capi.y, mouse.x - game.capi.x);
+      aimMode = 'MOUSE';
 
       if (ev.button === 2) {
         triggerCapiDash();
@@ -985,7 +1152,7 @@
       const c = game.capi;
 
       if (hp.state === 'IDLE') {
-        const ang = Math.atan2(mouse.y - c.y, mouse.x - c.x);
+        const ang = c.aimAngle;
         hp.state = 'SHOOTING';
         hp.x = c.x + Math.cos(ang) * 26;
         hp.y = c.y + Math.sin(ang) * 26;
@@ -1354,7 +1521,15 @@
       if (c.turboTimer > 0) c.turboTimer = Math.max(0, c.turboTimer - dt);
       if (c.dashCooldown > 0) c.dashCooldown = Math.max(0, c.dashCooldown - dt);
 
-      c.aimAngle = Math.atan2(mouse.y - c.y, mouse.x - c.x);
+      if (aimMode === 'MOUSE') {
+        c.aimAngle = Math.atan2(mouse.y - c.y, mouse.x - c.x);
+      } else if (aimMode === 'SWIM') {
+        if (joy.active && Math.hypot(joy.x, joy.y) > 0.15) {
+          c.aimAngle = Math.atan2(joy.y, joy.x);
+        }
+        mouse.x = Math.max(0, Math.min(W, c.x + Math.cos(c.aimAngle) * 145));
+        mouse.y = Math.max(0, Math.min(H, c.y + Math.sin(c.aimAngle) * 145));
+      }
 
       if (c.dashTimer > 0) {
         c.dashTimer -= dt;
@@ -1372,6 +1547,7 @@
         if (joy.active && Math.hypot(joy.x, joy.y) > 0.15) {
           ix = joy.x;
           iy = joy.y;
+          if (aimMode === 'MOUSE') aimMode = 'SWIM';
         }
 
         let weightPenalty = 1.0;
@@ -2004,7 +2180,18 @@
         ctx.restore();
       });
 
-      // 11. MIRA RETICULAR BRANCA [ ( • ) ] IDÊNTICA AO CENTRO DAS IMAGENS DE OCEANO!
+      // 11. Mira do Arpão (e linha de mira ao arrastar o botão no mobile)
+      if (aimJoy.active && c) {
+        ctx.save();
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([8, 6]);
+        ctx.beginPath();
+        ctx.moveTo(c.x, c.y);
+        ctx.lineTo(c.x + Math.cos(c.aimAngle) * 320, c.y + Math.sin(c.aimAngle) * 320);
+        ctx.stroke();
+        ctx.restore();
+      }
       drawHarpoonReticle(mouse.x, mouse.y);
 
       ctx.restore();
@@ -2796,12 +2983,24 @@
 
     function toggleFullScreen() {
       const docEl = document.documentElement;
-      if (!document.fullscreenElement) {
-        if (docEl.requestFullscreen) docEl.requestFullscreen().catch(() => { });
+      const isFs = document.fullscreenElement || document.webkitFullscreenElement;
+      if (!isFs) {
+        const req = docEl.requestFullscreen || docEl.webkitRequestFullscreen || docEl.msRequestFullscreen;
+        if (req) Promise.resolve(req.call(docEl)).catch(() => { });
       } else {
-        if (document.exitFullscreen) document.exitFullscreen().catch(() => { });
+        const exit = document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen;
+        if (exit) Promise.resolve(exit.call(document)).catch(() => { });
       }
     }
+
+    function syncFullscreenBtn() {
+      const btn = document.getElementById('btnFullscreen');
+      if (!btn) return;
+      const isFs = Boolean(document.fullscreenElement || document.webkitFullscreenElement);
+      btn.textContent = isFs ? '🗗 Sair' : '⛶ Tela';
+    }
+    document.addEventListener('fullscreenchange', syncFullscreenBtn);
+    document.addEventListener('webkitfullscreenchange', syncFullscreenBtn);
 
     // Popula o oceano inicial
     for (let i = 0; i < 5; i++) spawnTrashItem();
