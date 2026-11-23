@@ -752,6 +752,9 @@
 
     const W = 1100;
     const H = 620;
+    const WORLD_W = 2200;
+    const WORLD_H = 1320;
+    const cam = { x: (WORLD_W - W) / 2, y: (WORLD_H - H) / 2 };
     let viewScale = 1;
 
     function resizeCanvas() {
@@ -779,7 +782,7 @@
      * 3. ESTADO DO JOGO & CAMADA AMBIENTAL DE SILHUETAS MARINHAS
      **************************************************************/
     const keys = {};
-    const mouse = { x: W * 0.52, y: H * 0.45 };
+    const mouse = { x: WORLD_W * 0.5 + 120, y: WORLD_H * 0.5, screenX: W * 0.6, screenY: H * 0.5 };
 
     const game = {
       running: true,
@@ -795,8 +798,8 @@
       slotCounts: { bottle: 0, bag: 0, can: 0, heavy: 0, monster: 0, puffer: 0 },
 
       capi: {
-        x: W * 0.34,
-        y: H * 0.48,
+        x: WORLD_W * 0.5,
+        y: WORLD_H * 0.5,
         vx: 0,
         vy: 0,
         radius: 24,
@@ -842,35 +845,39 @@
     function initOceanAmbiance() {
       game.bgSilhouettes = [];
       const kinds = ['TURTLE', 'OCTOPUS', 'SEAHORSE', 'FISH_SMALL', 'ANGELFISH'];
-      for (let i = 0; i < 22; i++) {
+      for (let i = 0; i < 48; i++) {
         const k = kinds[i % kinds.length];
         const dir = Math.random() < 0.5 ? 1 : -1;
         game.bgSilhouettes.push({
           kind: k,
-          x: Math.random() * W,
-          y: 45 + Math.random() * (H - 135),
+          x: Math.random() * WORLD_W,
+          y: 45 + Math.random() * (WORLD_H - 90),
           scale: 0.45 + Math.random() * 0.65,
           vx: dir * (8 + Math.random() * 14),
           dir,
-          alpha: 0.25 + Math.random() * 0.22,
+          alpha: 0.24 + Math.random() * 0.22,
           phase: Math.random() * Math.PI * 2
         });
       }
 
-      // Peixes e Tartaruga Coloridos Amigáveis nadando calmamente no cenário (como o peixe amarelo, o peixe azul, o laranja e a tartaruga verde da imagem!)
+      // Peixes e Tartaruga Coloridos Amigáveis espalhados pelo oceano amplo
       game.ambientCreatures = [
-        { kind: 'YELLOW_FISH', x: 240, y: 78, vx: 22, dir: 1, phase: 0 },
-        { kind: 'BLUE_TANG', x: 685, y: 315, vx: 18, dir: 1, phase: 1.5 },
-        { kind: 'ORANGE_FISH', x: 45, y: 265, vx: 20, dir: 1, phase: 3.1 },
-        { kind: 'GREEN_TURTLE', x: 890, y: 42, vx: -16, dir: -1, phase: 0.8 }
+        { kind: 'YELLOW_FISH',  x: 340,  y: 180,  vx: 22,  dir: 1,  phase: 0 },
+        { kind: 'BLUE_TANG',    x: 1185, y: 520,  vx: 18,  dir: 1,  phase: 1.5 },
+        { kind: 'ORANGE_FISH',  x: 1650, y: 390,  vx: -20, dir: -1, phase: 3.1 },
+        { kind: 'GREEN_TURTLE', x: 890,  y: 260,  vx: -16, dir: -1, phase: 0.8 },
+        { kind: 'YELLOW_FISH',  x: 1820, y: 950,  vx: 20,  dir: 1,  phase: 2.2 },
+        { kind: 'BLUE_TANG',    x: 520,  y: 980,  vx: -17, dir: -1, phase: 4.0 },
+        { kind: 'ORANGE_FISH',  x: 1320, y: 1120, vx: 21,  dir: 1,  phase: 1.1 },
+        { kind: 'GREEN_TURTLE', x: 420,  y: 680,  vx: 15,  dir: 1,  phase: 2.7 }
       ];
 
-      // Bolhas esféricas translúcidas suaves igual às imagens
+      // Bolhas esféricas translúcidas suaves pelo cenário amplo
       game.bgBubbles = [];
-      for (let i = 0; i < 11; i++) {
+      for (let i = 0; i < 28; i++) {
         game.bgBubbles.push({
-          x: Math.random() * W,
-          y: Math.random() * H,
+          x: Math.random() * WORLD_W,
+          y: Math.random() * WORLD_H,
           r: 5 + Math.random() * 16,
           vy: -12 - Math.random() * 18,
           phase: Math.random() * Math.PI * 2
@@ -941,8 +948,8 @@
         const ang = Math.atan2(dy, dx);
         game.capi.aimAngle = ang;
         game.capi.facingRight = Math.cos(ang) >= 0;
-        mouse.x = Math.max(0, Math.min(W, game.capi.x + Math.cos(ang) * 145));
-        mouse.y = Math.max(0, Math.min(H, game.capi.y + Math.sin(ang) * 145));
+        mouse.x = Math.max(0, Math.min(WORLD_W, game.capi.x + Math.cos(ang) * 145));
+        mouse.y = Math.max(0, Math.min(WORLD_H, game.capi.y + Math.sin(ang) * 145));
       }
     }
 
@@ -1107,8 +1114,10 @@
       const rawY = (clientY - rect.top) * dpr;
       const offsetX = (canvas.width - W * viewScale) / 2;
       const offsetY = (canvas.height - H * viewScale) / 2;
-      mouse.x = Math.max(0, Math.min(W, (rawX - offsetX) / viewScale));
-      mouse.y = Math.max(0, Math.min(H, (rawY - offsetY) / viewScale));
+      mouse.screenX = Math.max(0, Math.min(W, (rawX - offsetX) / viewScale));
+      mouse.screenY = Math.max(0, Math.min(H, (rawY - offsetY) / viewScale));
+      mouse.x = cam.x + mouse.screenX;
+      mouse.y = cam.y + mouse.screenY;
     }
 
     canvas.addEventListener('touchstart', ev => {
@@ -1241,14 +1250,14 @@
       let x, y, vx, vy;
 
       if (!fromSide) {
-        x = 90 + Math.random() * (W - 180);
-        y = -25;
+        x = 90 + Math.random() * (WORLD_W - 180);
+        y = Math.max(-25, cam.y - 25);
         vx = (Math.random() - 0.5) * 26;
         vy = 22 + Math.random() * 24 + lvl * 3.5;
       } else {
         const left = Math.random() < 0.5;
-        x = left ? -25 : W + 25;
-        y = 80 + Math.random() * (H - 220);
+        x = left ? Math.max(-25, cam.x - 25) : Math.min(WORLD_W + 25, cam.x + W + 25);
+        y = Math.max(80, Math.min(WORLD_H - 120, cam.y + 70 + Math.random() * (H - 180)));
         vx = (left ? 1 : -1) * (30 + Math.random() * 26);
         vy = 8 + Math.random() * 14;
       }
@@ -1268,8 +1277,8 @@
       const left = Math.random() < 0.5;
       game.supplies.push({
         kind: 'HEART',
-        x: customX !== null ? customX : (left ? -20 : W + 20),
-        y: customY !== null ? customY : (100 + Math.random() * (H - 230)),
+        x: customX !== null ? customX : (left ? Math.max(-20, cam.x - 20) : Math.min(WORLD_W + 20, cam.x + W + 20)),
+        y: customY !== null ? customY : Math.max(90, Math.min(WORLD_H - 110, cam.y + 90 + Math.random() * (H - 210))),
         vx: customX !== null ? 0 : (left ? 48 : -48),
         vy: -5,
         radius: 20,
@@ -1288,8 +1297,8 @@
       const left = Math.random() < 0.5;
       game.supplies.push({
         kind,
-        x: left ? -20 : W + 20,
-        y: 105 + Math.random() * (H - 235),
+        x: left ? Math.max(-20, cam.x - 20) : Math.min(WORLD_W + 20, cam.x + W + 20),
+        y: Math.max(90, Math.min(WORLD_H - 110, cam.y + 90 + Math.random() * (H - 210))),
         vx: left ? 52 : -52,
         vy: 0,
         radius: 20,
@@ -1312,8 +1321,8 @@
       }
 
       const fromLeft = Math.random() < 0.5;
-      const x = fromLeft ? -36 : W + 36;
-      const y = 85 + Math.random() * (H - 205);
+      const x = fromLeft ? Math.max(-36, cam.x - 36) : Math.min(WORLD_W + 36, cam.x + W + 36);
+      const y = Math.max(75, Math.min(WORLD_H - 110, cam.y + 75 + Math.random() * (H - 195)));
       const speedMult = 1 + (lvl - 1) * 0.14;
 
       if (kind === 'JELLY') {
@@ -1341,7 +1350,7 @@
           hp: 3,
           maxHp: 3,
           pts: 120,
-          x, y: Math.max(105, Math.min(H - 185, y)),
+          x, y: Math.max(95, Math.min(WORLD_H - 120, y)),
           vx: (fromLeft ? 1 : -1) * 45 * speedMult,
           vy: 0,
           radius: 28,
@@ -1394,23 +1403,23 @@
           hp: 5,
           maxHp: 5,
           pts: 0,
-          x: W * 0.5 + (Math.random() - 0.5) * 260,
-          y: H + 60,
-          targetY: H * 0.5 + (Math.random() - 0.5) * 120,
+          x: cam.x + W * 0.5 + (Math.random() - 0.5) * 260,
+          y: cam.y + H + 60,
+          targetY: cam.y + H * 0.5 + (Math.random() - 0.5) * 120,
           vx: (fromLeft ? 1 : -1) * 38,
           vy: 0,
           radius: 42,
           whirlpoolCooldown: 3.2,
           whirlpoolTimer: 0,
-          whirlpoolX: W * 0.5,
-          whirlpoolY: H * 0.5,
+          whirlpoolX: cam.x + W * 0.5,
+          whirlpoolY: cam.y + H * 0.5,
           tentacleCooldown: 0.9,
           tentacles: [],
           phase: 0,
           stunTimer: 0,
           hitFlash: 0
         });
-        spawnFloatText(W / 2, 115, '🐙 KRAKEN ABISSAL DE DETRITOS SURGIU!', '#fca5a5');
+        spawnFloatText(cam.x + W / 2, cam.y + 115, '🐙 KRAKEN ABISSAL DE DETRITOS SURGIU!', '#fca5a5');
       }
     }
 
@@ -1443,11 +1452,11 @@
         spawnMonster(game.dangerLevel >= 2 ? 'PUFFER' : 'JELLY');
         spawnMonster(game.dangerLevel >= 3 ? 'EEL' : 'CRAB');
         spawnHeartSupply();
-        spawnFloatText(W / 2, 110, '🌊 CORRENTEZA FORTE + ❤️ VIDA EXTRA NO MAR!', '#bae6fd');
+        spawnFloatText(cam.x + W / 2, cam.y + 110, '🌊 CORRENTEZA FORTE + ❤️ VIDA EXTRA NO MAR!', '#bae6fd');
       }
 
       if (game.dangerLevel > oldLvl) {
-        spawnFloatText(W / 2, 145, `⚡ NÍVEL DE PROFUNDIDADE ${game.dangerLevel} ALCANÇADO!`, '#fde047');
+        spawnFloatText(cam.x + W / 2, cam.y + 145, `⚡ NÍVEL DE PROFUNDIDADE ${game.dangerLevel} ALCANÇADO!`, '#fde047');
       }
       updateTopHUD();
     }
@@ -1489,19 +1498,19 @@
       game.timeSec += dt;
       if (game.shakeTime > 0) game.shakeTime = Math.max(0, game.shakeTime - dt);
 
-      // Atualiza silhuetas marinhas de fundo, peixes amigáveis e bolhas translúcidas
+      // Atualiza silhuetas marinhas de fundo, peixes amigáveis e bolhas translúcidas pelo mundo todo
       game.bgSilhouettes.forEach(s => {
         s.x += s.vx * dt;
         s.phase += dt * 1.5;
-        if (s.vx > 0 && s.x > W + 60) s.x = -60;
-        if (s.vx < 0 && s.x < -60) s.x = W + 60;
+        if (s.vx > 0 && s.x > WORLD_W + 60) s.x = -60;
+        if (s.vx < 0 && s.x < -60) s.x = WORLD_W + 60;
       });
 
       game.ambientCreatures.forEach(ac => {
         ac.x += ac.vx * dt;
         ac.phase += dt * 3;
-        if (ac.vx > 0 && ac.x > W + 70) ac.x = -70;
-        if (ac.vx < 0 && ac.x < -70) ac.x = W + 70;
+        if (ac.vx > 0 && ac.x > WORLD_W + 70) ac.x = -70;
+        if (ac.vx < 0 && ac.x < -70) ac.x = WORLD_W + 70;
       });
 
       game.bgBubbles.forEach(b => {
@@ -1509,8 +1518,8 @@
         b.phase += dt * 2;
         b.x += Math.sin(b.phase) * 8 * dt;
         if (b.y < -30) {
-          b.y = H + 25;
-          b.x = Math.random() * W;
+          b.y = WORLD_H + 25;
+          b.x = Math.random() * WORLD_W;
         }
       });
 
@@ -1522,13 +1531,15 @@
       if (c.dashCooldown > 0) c.dashCooldown = Math.max(0, c.dashCooldown - dt);
 
       if (aimMode === 'MOUSE') {
+        mouse.x = cam.x + mouse.screenX;
+        mouse.y = cam.y + mouse.screenY;
         c.aimAngle = Math.atan2(mouse.y - c.y, mouse.x - c.x);
       } else if (aimMode === 'SWIM') {
         if (joy.active && Math.hypot(joy.x, joy.y) > 0.15) {
           c.aimAngle = Math.atan2(joy.y, joy.x);
         }
-        mouse.x = Math.max(0, Math.min(W, c.x + Math.cos(c.aimAngle) * 145));
-        mouse.y = Math.max(0, Math.min(H, c.y + Math.sin(c.aimAngle) * 145));
+        mouse.x = Math.max(0, Math.min(WORLD_W, c.x + Math.cos(c.aimAngle) * 145));
+        mouse.y = Math.max(0, Math.min(WORLD_H, c.y + Math.sin(c.aimAngle) * 145));
       }
 
       if (c.dashTimer > 0) {
@@ -1575,8 +1586,14 @@
         c.y += c.vy * dt;
       }
 
-      c.x = Math.max(42, Math.min(W - 42, c.x));
-      c.y = Math.max(62, Math.min(H - 85, c.y));
+      c.x = Math.max(42, Math.min(WORLD_W - 42, c.x));
+      c.y = Math.max(62, Math.min(WORLD_H - 72, c.y));
+
+      // Câmera segue suavemente a Capivara quando ela nada pelo cenário amplo
+      const targetCamX = Math.max(0, Math.min(WORLD_W - W, c.x - W * 0.5));
+      const targetCamY = Math.max(0, Math.min(WORLD_H - H, c.y - H * 0.5));
+      cam.x += (targetCamX - cam.x) * Math.min(1, dt * 5.5);
+      cam.y += (targetCamY - cam.y) * Math.min(1, dt * 5.5);
 
       // 2. Atualização do Arpão com Corda Retrátil
       const maxLen = c.turboTimer > 0 ? hp.maxLength * 1.35 : hp.maxLength;
@@ -1640,7 +1657,7 @@
           }
         }
 
-        if (Math.hypot(hp.x - c.x, hp.y - c.y) >= maxLen || hp.x < 12 || hp.x > W - 12 || hp.y < 15 || hp.y > H - 15) {
+        if (Math.hypot(hp.x - c.x, hp.y - c.y) >= maxLen || hp.x < 12 || hp.x > WORLD_W - 12 || hp.y < 15 || hp.y > WORLD_H - 15) {
           hp.state = 'REELING';
         }
       } else if (hp.state === 'REELING') {
@@ -1703,10 +1720,10 @@
 
       // 3. Atualização dos Resíduos
       trashSpawnTimer -= dt;
-      const maxTrashes = 7 + game.dangerLevel * 2;
+      const maxTrashes = 16 + game.dangerLevel * 3;
       if (trashSpawnTimer <= 0 && game.trashes.length < maxTrashes) {
         spawnTrashItem();
-        trashSpawnTimer = Math.max(0.65, 1.75 - game.dangerLevel * 0.18);
+        trashSpawnTimer = Math.max(0.45, 1.35 - game.dangerLevel * 0.14);
       }
 
       for (let i = game.trashes.length - 1; i >= 0; i--) {
@@ -1715,7 +1732,7 @@
           t.x += t.vx * dt;
           t.y += t.vy * dt;
           t.rot += t.rotSpd * dt * 0.35;
-          if (t.y > H + 45 || t.x < -70 || t.x > W + 70) {
+          if (t.y > WORLD_H + 45 || t.x < -80 || t.x > WORLD_W + 80) {
             game.trashes.splice(i, 1);
           }
         }
@@ -1744,7 +1761,7 @@
             game.supplies.splice(i, 1);
             continue;
           }
-          if (s.x < -60 || s.x > W + 60) {
+          if (s.x < -80 || s.x > WORLD_W + 80) {
             game.supplies.splice(i, 1);
           }
         }
@@ -1752,7 +1769,7 @@
 
       // 5. Atualização dos Monstros
       monsterSpawnTimer -= dt;
-      const maxMonsters = 2 + game.dangerLevel * 2;
+      const maxMonsters = 4 + game.dangerLevel * 2;
       if (monsterSpawnTimer <= 0 && game.monsters.length < maxMonsters) {
         spawnMonster();
         monsterSpawnTimer = Math.max(0.9, 2.8 - game.dangerLevel * 0.35);
@@ -1814,7 +1831,7 @@
           if (m.state === 'PATROL') {
             m.x += m.vx * dt;
             m.stateTimer -= dt;
-            if (m.stateTimer <= 0 && m.x > 80 && m.x < W - 80) {
+            if (m.stateTimer <= 0 && m.x > cam.x + 80 && m.x < cam.x + W - 80) {
               m.state = 'AIMING';
               m.stateTimer = 0.85;
               m.dashAngle = Math.atan2(c.y - m.y, c.x - m.x);
@@ -1843,10 +1860,10 @@
             m.x += m.vx * dt;
             m.y += Math.sin(m.phase * 0.5) * 22 * dt;
             if (m.x < 140) m.vx = Math.abs(m.vx);
-            if (m.x > W - 140) m.vx = -Math.abs(m.vx);
+            if (m.x > WORLD_W - 140) m.vx = -Math.abs(m.vx);
           }
 
-          // 1. Tentáculos gigantes emergem das laterais ou do fundo tentando varrer a área da capivara
+          // 1. Tentáculos gigantes emergem das laterais ou do fundo da tela visível tentando varrer a área da capivara
           m.tentacleCooldown -= dt;
           if (m.tentacleCooldown <= 0 && m.tentacles.length < 2) {
             m.tentacleCooldown = 2.1;
@@ -1854,22 +1871,22 @@
             const edge = edges[Math.floor(Math.random() * edges.length)];
             let baseX, baseY, sweepA0, sweepA1, len;
             if (edge === 'LEFT') {
-              baseX = -15;
-              baseY = Math.max(100, Math.min(H - 120, c.y + (Math.random() - 0.5) * 80));
+              baseX = cam.x - 15;
+              baseY = Math.max(cam.y + 90, Math.min(cam.y + H - 100, c.y + (Math.random() - 0.5) * 80));
               const aim = Math.atan2(c.y - baseY, c.x - baseX);
               sweepA0 = aim - 0.42;
               sweepA1 = aim + 0.42;
               len = 360 + Math.random() * 120;
             } else if (edge === 'RIGHT') {
-              baseX = W + 15;
-              baseY = Math.max(100, Math.min(H - 120, c.y + (Math.random() - 0.5) * 80));
+              baseX = cam.x + W + 15;
+              baseY = Math.max(cam.y + 90, Math.min(cam.y + H - 100, c.y + (Math.random() - 0.5) * 80));
               const aim = Math.atan2(c.y - baseY, c.x - baseX);
               sweepA0 = aim - 0.42;
               sweepA1 = aim + 0.42;
               len = 360 + Math.random() * 120;
             } else {
-              baseX = Math.max(130, Math.min(W - 130, c.x + (Math.random() - 0.5) * 100));
-              baseY = H + 15;
+              baseX = Math.max(cam.x + 120, Math.min(cam.x + W - 120, c.x + (Math.random() - 0.5) * 100));
+              baseY = cam.y + H + 15;
               const aim = Math.atan2(c.y - baseY, c.x - baseX);
               sweepA0 = aim - 0.45;
               sweepA1 = aim + 0.45;
@@ -1944,8 +1961,8 @@
             if (m.whirlpoolCooldown <= 0) {
               m.whirlpoolCooldown = 4.6;
               m.whirlpoolTimer = 2.6;
-              m.whirlpoolX = Math.max(180, Math.min(W - 180, c.x + (Math.random() - 0.5) * 180));
-              m.whirlpoolY = Math.max(140, Math.min(H - 160, c.y + (Math.random() - 0.5) * 120));
+              m.whirlpoolX = Math.max(180, Math.min(WORLD_W - 180, c.x + (Math.random() - 0.5) * 180));
+              m.whirlpoolY = Math.max(140, Math.min(WORLD_H - 160, c.y + (Math.random() - 0.5) * 120));
             }
           }
         }
@@ -1955,7 +1972,7 @@
           damageCapi();
         }
 
-        if (m.x < -110 || m.x > W + 110 || m.y < -110 || m.y > H + 110) {
+        if (m.x < -120 || m.x > WORLD_W + 120 || m.y < -120 || m.y > WORLD_H + 120) {
           game.monsters.splice(i, 1);
         }
       }
@@ -1970,7 +1987,7 @@
           damageCapi();
           continue;
         }
-        if (p.x < -30 || p.x > W + 30 || p.y < -30 || p.y > H + 30) {
+        if (p.x < -40 || p.x > WORLD_W + 40 || p.y < -40 || p.y > WORLD_H + 40) {
           game.projectiles.splice(i, 1);
         }
       }
@@ -2019,8 +2036,8 @@
         game.monsters.forEach(m => {
           m.stunTimer = Math.max(m.stunTimer, 4.0);
           const ang = Math.atan2(m.y - c.y, m.x - c.x);
-          m.x = Math.max(30, Math.min(W - 30, m.x + Math.cos(ang) * 115));
-          m.y = Math.max(60, Math.min(H - 80, m.y + Math.sin(ang) * 115));
+          m.x = Math.max(30, Math.min(WORLD_W - 30, m.x + Math.cos(ang) * 115));
+          m.y = Math.max(60, Math.min(WORLD_H - 80, m.y + Math.sin(ang) * 115));
         });
         spawnFloatText(c.x, c.y - 36, '🔊 ONDA SONAR! MONSTROS ATORDOADOS (4s)!', '#67e8f9');
       }
@@ -2062,6 +2079,17 @@
       if (game.shakeTime > 0) {
         ctx.translate((Math.random() - 0.5) * 9, (Math.random() - 0.5) * 9);
       }
+
+      // Câmera 2D acompanha a Capivara pelo oceano amplo (WORLD_W x WORLD_H)
+      ctx.translate(-cam.x, -cam.y);
+
+      // Borda sutil luminosa indicando os limites da área do oceano
+      ctx.save();
+      ctx.strokeStyle = 'rgba(186, 230, 253, 0.32)';
+      ctx.lineWidth = 6;
+      ctx.setLineDash([20, 14]);
+      ctx.strokeRect(12, 12, WORLD_W - 24, WORLD_H - 24);
+      ctx.restore();
 
       // 2. Silhuetas Marinhas Azul-Marinho ao Fundo (Tartarugas, Polvos, Cavalos-Marinhos e Cardumes — Idênticas às imagens!)
       game.bgSilhouettes.forEach(s => drawMarineSilhouette(s));
@@ -2954,9 +2982,10 @@
       game.monstersDefeated = 0;
       game.dangerLevel = 1;
       game.waveMeter = 0;
-      resetDockSlots();
-      game.capi.x = W * 0.34;
-      game.capi.y = H * 0.48;
+      game.capi.x = WORLD_W * 0.5;
+      game.capi.y = WORLD_H * 0.5;
+      cam.x = (WORLD_W - W) * 0.5;
+      cam.y = (WORLD_H - H) * 0.5;
       game.capi.vx = 0;
       game.capi.vy = 0;
       game.capi.lives = 3;
@@ -2973,7 +3002,7 @@
       game.floatTexts = [];
       game.sonarWaves = [];
 
-      for (let i = 0; i < 5; i++) spawnTrashItem();
+      for (let i = 0; i < 12; i++) spawnTrashItem();
       spawnMonster('JELLY');
       spawnMonster('PUFFER');
       updateTopHUD();
@@ -3003,7 +3032,7 @@
     document.addEventListener('webkitfullscreenchange', syncFullscreenBtn);
 
     // Popula o oceano inicial
-    for (let i = 0; i < 5; i++) spawnTrashItem();
+    for (let i = 0; i < 12; i++) spawnTrashItem();
     spawnMonster('JELLY');
     spawnMonster('PUFFER');
     updateTopHUD();
