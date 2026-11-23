@@ -1,0 +1,2824 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Carla: A Capivara Mergulhadora</title>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800;900&display=swap"
+    rel="stylesheet">
+  <style>
+    :root {
+      --ocean-top: #0298db;
+      --ocean-mid: #0878b2;
+      --ocean-bot: #2b8999;
+      --slot-teal: #2a6f67;
+      --dock-bg: rgba(216, 232, 238, 0.86);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100vh;
+      height: 100dvh;
+      overflow: hidden;
+      background: var(--ocean-mid);
+      font-family: 'Nunito', sans-serif;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      touch-action: none;
+    }
+
+    /* PALCO SUBAQUÁTICO EM TELA CHEIA (ESTILO UNITY WEBGL / OCEANO) */
+    .ocean-stage {
+      flex: 1;
+      position: relative;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: linear-gradient(180deg, #0298db 0%, #0977b0 65%, #2e8b9a 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #gameCanvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      cursor: none;
+    }
+
+    /* HUD SUPERIOR FLUTUANTE LIMPO E TRANSLÚCIDO */
+    .top-overlay-hud {
+      position: absolute;
+      top: 12px;
+      left: 16px;
+      right: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      pointer-events: none;
+      z-index: 30;
+    }
+
+    .hud-left-cluster,
+    .hud-center-cluster,
+    .hud-right-cluster {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      pointer-events: auto;
+    }
+
+    .glass-pill {
+      background: rgba(255, 255, 255, 0.22);
+      backdrop-filter: blur(6px);
+      border: 2px solid rgba(255, 255, 255, 0.85);
+      border-radius: 999px;
+      padding: 5px 14px;
+      font-family: 'Fredoka', sans-serif;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      text-shadow: 0 1px 3px rgba(0, 45, 75, 0.45);
+      box-shadow: 0 4px 12px rgba(0, 40, 70, 0.18);
+      white-space: nowrap;
+    }
+
+    .glass-pill.score-pill {
+      background: rgba(255, 255, 255, 0.3);
+      font-size: 1rem;
+      font-weight: 700;
+    }
+
+    .glass-btn {
+      background: rgba(142, 202, 230, 0.42);
+      backdrop-filter: blur(4px);
+      border: 2px solid #ffffff;
+      border-radius: 12px;
+      padding: 6px 12px;
+      color: #ffffff;
+      font-family: 'Fredoka', sans-serif;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      text-shadow: 0 1px 2px rgba(0, 45, 75, 0.45);
+      transition: background 0.15s, transform 0.08s;
+    }
+
+    .glass-btn:hover {
+      background: rgba(142, 202, 230, 0.65);
+    }
+
+    .glass-btn:active {
+      transform: scale(0.96);
+    }
+
+    /* BOTÃO DE PAUSA / AJUDA NO CANTO SUPERIOR DIREITO (IDÊNTICO AO "||" DAS IMAGENS!) */
+    .pause-square-btn {
+      width: 48px;
+      height: 48px;
+      background: rgba(155, 206, 232, 0.58);
+      backdrop-filter: blur(4px);
+      border: 2.5px solid #ffffff;
+      border-radius: 13px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(0, 45, 75, 0.2);
+      transition: transform 0.1s, background 0.15s;
+    }
+
+    .pause-square-btn:hover {
+      background: rgba(155, 206, 232, 0.8);
+    }
+
+    .pause-bar {
+      width: 7px;
+      height: 24px;
+      background: #ffffff;
+      border-radius: 999px;
+    }
+
+    /* GAVETA DEMO PARA TESTAR MECÂNICAS */
+    .debug-drawer {
+      position: fixed;
+      top: 68px;
+      right: 16px;
+      background: rgba(12, 74, 110, 0.92);
+      backdrop-filter: blur(10px);
+      border: 2px solid #ffffff;
+      box-shadow: 0 12px 28px rgba(0, 30, 60, 0.45);
+      border-radius: 16px;
+      padding: 12px;
+      display: none;
+      flex-direction: column;
+      gap: 6px;
+      z-index: 120;
+      min-width: 245px;
+    }
+
+    .debug-drawer.active {
+      display: flex;
+    }
+
+    .btn-debug {
+      background: rgba(255, 255, 255, 0.16);
+      color: #fff;
+      border: 1.5px solid rgba(255, 255, 255, 0.65);
+      border-radius: 10px;
+      padding: 7px 10px;
+      font-family: 'Nunito', sans-serif;
+      font-weight: 800;
+      font-size: 0.78rem;
+      cursor: pointer;
+      text-align: left;
+      transition: background 0.12s;
+    }
+
+    .btn-debug:hover {
+      background: rgba(255, 255, 255, 0.3);
+    }
+
+    /* CONTROLES E BARRA INFERIOR IDÊNTICOS ÀS IMAGENS DE OCEANO */
+    .bottom-hud-layer {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      padding: 0 28px 18px 28px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      pointer-events: none;
+      z-index: 25;
+    }
+
+    /* JOYSTICK CIRCULAR TRANSLÚCIDO ESQUERDO (CÍRCULO BRANCO CENTRAL + 4 SETAS) */
+    .virtual-joy-circle {
+      pointer-events: auto;
+      position: relative;
+      width: 124px;
+      height: 124px;
+      border-radius: 50%;
+      background: rgba(215, 232, 242, 0.42);
+      border: 2px solid rgba(255, 255, 255, 0.72);
+      backdrop-filter: blur(3px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 6px 18px rgba(0, 40, 70, 0.18);
+      flex-shrink: 0;
+    }
+
+    .joy-center-knob {
+      width: 46px;
+      height: 46px;
+      border-radius: 50%;
+      background: #ffffff;
+      box-shadow: 0 2px 6px rgba(0, 45, 75, 0.22);
+      pointer-events: none;
+    }
+
+    .joy-arrow {
+      position: absolute;
+      width: 38px;
+      height: 38px;
+      background: transparent;
+      border: none;
+      color: #ffffff;
+      font-size: 1.15rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      opacity: 0.95;
+      transition: transform 0.08s;
+    }
+
+    .joy-arrow {
+      pointer-events: none;
+    }
+
+    .virtual-joy-circle {
+      touch-action: none;
+      cursor: grab;
+    }
+
+    .joy-center-knob {
+      transition: transform 0.12s ease-out;
+    }
+
+    .joy-center-knob.dragging {
+      transition: none;
+    }
+
+    .joy-arrow.up {
+      top: 2px;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    .joy-arrow.down {
+      bottom: 2px;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    .joy-arrow.left {
+      left: 2px;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+
+    .joy-arrow.right {
+      right: 2px;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+
+    /* BARRA INFERIOR CENTRAL COM 6 QUADRADO VERDE-OCEANO E SILHUETAS (IDÊNTICA À IMAGEM!) */
+    .collection-dock {
+      pointer-events: auto;
+      background: var(--dock-bg);
+      backdrop-filter: blur(6px);
+      border: 2.5px solid #ffffff;
+      border-bottom: none;
+      border-radius: 22px 22px 0 0;
+      padding: 12px 22px 10px 22px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: -18px;
+      box-shadow: 0 -4px 18px rgba(0, 45, 75, 0.16);
+    }
+
+    .dock-slot {
+      position: relative;
+      width: 54px;
+      height: 50px;
+      background: var(--slot-teal);
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      transition: transform 0.15s, background 0.2s;
+    }
+
+    .dock-slot.collected {
+      background: #1f8a7c;
+      box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.75);
+    }
+
+    .dock-slot svg {
+      width: 38px;
+      height: 38px;
+      fill: #072227;
+      transition: fill 0.2s, transform 0.2s;
+    }
+
+    .dock-slot.collected svg {
+      fill: #d1fae5;
+      transform: scale(1.06);
+    }
+
+    .dock-count {
+      position: absolute;
+      bottom: 2px;
+      right: 4px;
+      font-family: 'Fredoka', sans-serif;
+      font-size: 0.68rem;
+      font-weight: 700;
+      color: #ffffff;
+      opacity: 0.9;
+    }
+
+    /* BOTÕES CIRCULARES DIREITOS (ESTILO BOTÃO DE CÂMERA CIRCULAR DA IMAGEM!) */
+    /* BOTÕES CIRCULARES DIREITOS */
+    .right-action-cluster {
+      pointer-events: auto;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+
+    .action-circle-btn {
+      width: 92px;
+      height: 92px;
+      border-radius: 50%;
+      background: rgba(215, 232, 242, 0.45);
+      border: 2px solid rgba(255, 255, 255, 0.78);
+      padding: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 6px 18px rgba(0, 40, 70, 0.18);
+      transition: transform 0.08s;
+    }
+
+    .action-circle-btn:active {
+      transform: scale(0.93);
+    }
+
+    .action-circle-inner {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      background: #e6f0f5;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #5c676d;
+      font-family: 'Fredoka', sans-serif;
+      font-weight: 700;
+      font-size: 0.72rem;
+      gap: 1px;
+    }
+
+    .action-circle-btn.small {
+      width: 66px;
+      height: 66px;
+      padding: 6px;
+    }
+
+    /* BARRA DE RODAPÉ FINA ESTILO UNITY WEBGL */
+    .unity-footer-bar {
+      height: 24px;
+      background: #2f8794;
+      border-top: 1px solid rgba(255, 255, 255, 0.25);
+      padding: 0 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-family: 'Nunito', sans-serif;
+      font-size: 0.75rem;
+      font-weight: 800;
+      color: rgba(255, 255, 255, 0.9);
+      z-index: 30;
+    }
+
+    /* MODAIS LIMPOS ESTILO OCEANO */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(4, 55, 88, 0.72);
+      backdrop-filter: blur(6px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+      padding: 14px;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .modal-card {
+      width: 100%;
+      max-width: 540px;
+      background: #f0f9ff;
+      color: #0c4a6e;
+      border: 3px solid #ffffff;
+      box-shadow: 0 20px 50px rgba(0, 35, 65, 0.5);
+      border-radius: 24px;
+      padding: 22px 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 12px;
+    }
+
+    .modal-badge {
+      background: #0284c7;
+      color: #ffffff;
+      font-family: 'Fredoka', sans-serif;
+      font-weight: 600;
+      font-size: 0.76rem;
+      padding: 4px 14px;
+      border-radius: 999px;
+    }
+
+    .modal-title {
+      font-family: 'Fredoka', sans-serif;
+      font-size: 1.45rem;
+      color: #0369a1;
+    }
+
+    .modal-body {
+      width: 100%;
+      background: #ffffff;
+      border: 2px solid #bae6fd;
+      border-radius: 16px;
+      padding: 13px 16px;
+      text-align: left;
+      font-size: 0.88rem;
+      line-height: 1.48;
+      color: #0f172a;
+    }
+
+    .btn-primary-big {
+      width: 100%;
+      background: linear-gradient(180deg, #0ea5e9 0%, #0284c7 100%);
+      color: #ffffff;
+      border: 2px solid #ffffff;
+      box-shadow: 0 6px 16px rgba(2, 132, 199, 0.35);
+      border-radius: 14px;
+      padding: 12px 18px;
+      font-family: 'Fredoka', sans-serif;
+      font-size: 1.05rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: filter 0.15s, transform 0.08s;
+    }
+
+    .btn-primary-big:hover {
+      filter: brightness(1.07);
+    }
+
+    .btn-primary-big:active {
+      transform: scale(0.98);
+    }
+
+    @media (max-width: 780px) {
+      .collection-dock {
+        padding: 8px 10px;
+        gap: 6px;
+      }
+
+      .dock-slot {
+        width: 40px;
+        height: 38px;
+      }
+
+      .virtual-joy-circle {
+        width: 100px;
+        height: 100px;
+      }
+
+      .action-circle-btn {
+        width: 76px;
+        height: 76px;
+      }
+
+      .glass-pill {
+        padding: 4px 10px;
+        font-size: 0.78rem;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- PALCO DO OCEANO (ESTILO OCEANO - UNITY) -->
+  <div class="ocean-stage">
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- HUD SUPERIOR FLUTUANTE -->
+    <div class="top-overlay-hud">
+      <div class="hud-left-cluster">
+        <div class="glass-pill" id="hudHeartsPill" title="Vidas da Capivara Mergulhadora">
+          <span>🦫</span>
+          <span id="hudHearts">❤️❤️❤️</span>
+        </div>
+        <div class="glass-pill score-pill">
+          <span>🏆</span>
+          <span id="hudScore">0 PTS</span>
+        </div>
+        <div class="glass-pill">
+          <span>⭐ Recorde:</span>
+          <span id="hudHighScore">0</span>
+        </div>
+      </div>
+
+      <div class="hud-center-cluster">
+        <div class="glass-pill"><span>♻️</span><span id="hudTrash">0 lixos</span></div>
+        <div class="glass-pill" id="hudDangerLevel">
+          <span>🌊 Nível 1: Águas Calmas</span>
+        </div>
+      </div>
+
+      <div class="hud-right-cluster">
+        <button class="glass-btn" id="btnMusic" onclick="toggleSound()">🎵 Som</button>
+        <button class="glass-btn" onclick="toggleDebugDrawer()">⚙️ Demo</button>
+        <button class="pause-square-btn" onclick="openHelpModal()" title="Pausar / Como Jogar">
+          <span class="pause-bar"></span>
+          <span class="pause-bar"></span>
+        </button>
+      </div>
+    </div>
+
+    <!-- GAVETA DEMO PARA TESTAR MONSTROS, VIDAS E POWER-UPS -->
+    <div class="debug-drawer" id="debugDrawer">
+      <div style="font-family:'Fredoka',sans-serif; font-size:0.86rem; color:#bae6fd; margin-bottom:2px;">
+        Painel de Teste (Carla):
+      </div>
+      <button class="btn-debug" onclick="spawnHeartSupply()">❤️ Dropar Vida Extra (Coração)</button>
+      <button class="btn-debug" onclick="spawnPowerupSupply('TURBO')">⚡ Dropar Carretilha Turbo</button>
+      <button class="btn-debug" onclick="spawnPowerupSupply('SHIELD')">🫧 Dropar Escudo de Bolha</button>
+      <button class="btn-debug" onclick="spawnPowerupSupply('SONAR')">🔊 Dropar Onda Sonar Ecológica</button>
+      <button class="btn-debug" onclick="forceSpawnMonster('PUFFER')">🐡 Invocar Baiacu-Espinhoso (3 HP)</button>
+      <button class="btn-debug" onclick="forceSpawnMonster('CRAB')">🦀 Invocar Caranguejo-Sucata (2 HP)</button>
+      <button class="btn-debug" onclick="forceSpawnMonster('EEL')">🐍 Invocar Enguia de Óleo (2 HP)</button>
+      <button class="btn-debug" onclick="forceSpawnMonster('KRAKEN')">🐙 Invocar Kraken Abissal (5 HP)</button>
+      <button class="btn-debug" onclick="addDemoScore(300)">📈 +300 Pontos (Subir Dificuldade)</button>
+      <button class="btn-debug" onclick="restartGame()">🔄 Reiniciar Partida</button>
+    </div>
+
+    <!-- CAMADA INFERIOR: JOYSTICK TRANSLÚCIDO + BARRA DE 6 SLOTS COM SILHUETAS + BOTÃO CIRCULAR DIREITO -->
+    <div class="bottom-hud-layer">
+      <!-- Joystick Circular Translúcido Esquerdo (Idêntico ao das imagens!) -->
+      <div class="virtual-joy-circle" id="joyBase">
+        <span class="joy-arrow up">▲</span>
+        <span class="joy-arrow left">◄</span>
+        <div class="joy-center-knob" id="joyKnob"></div>
+        <span class="joy-arrow right">►</span>
+        <span class="joy-arrow down">▼</span>
+      </div>
+
+      <!-- Botões Circulares Translúcidos à Direita (Idêntico ao botão circular de ação da imagem!) -->
+      <div class="right-action-cluster">
+        <button class="action-circle-btn small" onclick="triggerCapiDash()" title="Capi-Dash (Espaço / Botão Direito)">
+          <div class="action-circle-inner">
+            <span style="font-size:1.2rem;">💨</span>
+            <span>DASH</span>
+          </div>
+        </button>
+        <button class="action-circle-btn" onclick="fireOrReleaseHarpoon()" title="Disparar / Recolher Arpão com Corda">
+          <div class="action-circle-inner">
+            <span style="font-size:1.55rem; color:#4b5563;">⚓</span>
+            <span>ARPÃO</span>
+          </div>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RODAPÉ ESTILO UNITY WEBGL -->
+  <footer class="unity-footer-bar">
+    <span>Unity • Diversi Games</span>
+    <span>Carla_Demo &nbsp;|&nbsp; <a href="javascript:void(0)" onclick="toggleFullScreen()"
+        style="color:#fff; text-decoration:underline;">⛶ Tela Cheia</a></span>
+  </footer>
+
+  <!-- MODAL DE PAUSA / COMO JOGAR -->
+  <div class="modal-overlay active" id="helpModal">
+    <div class="modal-card">
+      <span class="modal-badge">UNITY 2D • ARTE VETORIAL SUBAQUÁTICA</span>
+      <div style="font-size: 2.7rem; line-height: 1;">🦫🤿🌊</div>
+      <h2 class="modal-title">Carla: A Capivara Mergulhadora</h2>
+
+      <div class="modal-body">
+        <p style="margin-bottom:8px; font-weight:800; color:#0284c7;">
+          Limpe o oceano com seu Arpão de Corda, preencha o painel de coleta e derrote os monstros da poluição!
+        </p>
+        <ul style="padding-left:18px; display:flex; flex-direction:column; gap:6px; font-weight:700;">
+          <li>🏊 <strong>Nadar em 360°:</strong> Use <code>WASD</code>, <code>Setas</code> ou o <strong>Joystick
+              Circular</strong> no canto inferior esquerdo.</li>
+          <li>🎯 <strong>Mira & Arpão com Corda:</strong> Aponte com o mouse (ou toque) e clique com o <strong>Botão
+              Esquerdo</strong> (ou no botão circular <strong>⚓ ARPÃO</strong>) para fisgar <strong>Garrafas PET
+              amassadas, Sacolas, Latas e Pneus</strong> ou <strong>atacar e derrotar os Monstros</strong>!</li>
+          <li>❤️ <strong>Vidas Extras & Power-ups:</strong> Fisgue corações <code>❤️</code> nas bolhas (ou derrote os
+            Baiacus) para recuperar vidas, além de <code>⚡ Carretilha Turbo</code> e <code>🫧 Escudo de Bolha</code>.
+          </li>
+          <li>💨 <strong>Esquiva Rápida (Capi-Dash):</strong> Pressione <code>Espaço</code>, <code>Botão Direito</code>
+            ou o botão <strong>💨 DASH</strong> para escapar de botes e espinhos!</li>
+        </ul>
+      </div>
+
+      <button class="btn-primary-big" onclick="closeHelpModal()">
+        ▶️ Mergulhar no Oceano!
+      </button>
+    </div>
+  </div>
+
+  <!-- MODAL DE GAME OVER -->
+  <div class="modal-overlay" id="gameOverModal">
+    <div class="modal-card">
+      <span class="modal-badge" style="background:#ef4444;">FIM DO MERGULHO • 0 VIDAS</span>
+      <div style="font-size: 2.7rem; line-height: 1;">🦫🛟🌊</div>
+      <h2 class="modal-title" style="color:#b91c1c;">A Capivara precisou voltar ao barco!</h2>
+
+      <div class="modal-body" id="gameOverStats"></div>
+
+      <button class="btn-primary-big" onclick="restartGame()">
+        🔄 Mergulhar Novamente
+      </button>
+    </div>
+  </div>
+
+  <script>
+    /**************************************************************
+     * 1. ÁUDIO SINTETIZADO SUBAQUÁTICO (WEB AUDIO API)
+     **************************************************************/
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    let audioCtx = null;
+    let soundEnabled = true;
+    let bgmStarted = false;
+    let bgmStep = 0;
+
+    const OCEAN_NOTES = [261.63, 329.63, 392.00, 523.25, 392.00, 329.63, 293.66, 349.23, 440.00, 349.23];
+
+    function ensureAudio() {
+      if (!audioCtx) audioCtx = new AudioCtx();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      if (!bgmStarted) {
+        bgmStarted = true;
+        setInterval(() => {
+          if (!soundEnabled || !audioCtx || !game.running || game.paused) return;
+          const freq = OCEAN_NOTES[bgmStep % OCEAN_NOTES.length];
+          bgmStep++;
+          playTone(freq, 'sine', 0.022, 0.24);
+        }, 300);
+      }
+    }
+
+    function playTone(freq, type, vol, dur, endFreq = null) {
+      if (!soundEnabled || !audioCtx) return;
+      try {
+        const now = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, now);
+        if (endFreq) osc.frequency.exponentialRampToValueAtTime(endFreq, now + dur);
+        gain.gain.setValueAtTime(vol, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + dur);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now);
+        osc.stop(now + dur);
+      } catch (e) { }
+    }
+
+    function sfx(kind) {
+      ensureAudio();
+      if (kind === 'shoot') playTone(520, 'triangle', 0.14, 0.12, 240);
+      else if (kind === 'hook') playTone(680, 'sine', 0.15, 0.09, 880);
+      else if (kind === 'collect') {
+        playTone(523.25, 'triangle', 0.16, 0.1);
+        setTimeout(() => playTone(659.25, 'triangle', 0.16, 0.14), 70);
+      } else if (kind === 'heart') {
+        playTone(587.33, 'sine', 0.18, 0.12);
+        setTimeout(() => playTone(880, 'sine', 0.2, 0.22), 90);
+      } else if (kind === 'dash') playTone(320, 'sine', 0.14, 0.18, 640);
+      else if (kind === 'hit') playTone(180, 'sawtooth', 0.22, 0.28, 85);
+      else if (kind === 'cut') playTone(300, 'square', 0.16, 0.15, 140);
+      else if (kind === 'kill') {
+        playTone(440, 'square', 0.16, 0.08, 660);
+        setTimeout(() => playTone(880, 'triangle', 0.18, 0.16, 1174), 65);
+      }
+    }
+
+    function toggleSound() {
+      soundEnabled = !soundEnabled;
+      document.getElementById('btnMusic').textContent = soundEnabled ? '🎵 Som' : '🔇 Mudo';
+    }
+
+    window.addEventListener('contextmenu', e => e.preventDefault());
+
+    /**************************************************************
+     * 2. CONFIGURAÇÃO DO CANVAS 2D & ELEMENTOS DE FUNDO (OCEANO)
+     **************************************************************/
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    const W = 1100;
+    const H = 620;
+    let viewScale = 1;
+
+    function resizeCanvas() {
+      const stage = canvas.parentElement;
+      const rect = stage.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.round(rect.width * dpr);
+      canvas.height = Math.round(rect.height * dpr);
+      viewScale = Math.min(canvas.width / W, canvas.height / H);
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    // Catálogo de Resíduos Marinhos (Sem contorno preto pesado, visual vetorial igual à Garrafa PET da imagem!)
+    const TRASH_TYPES = [
+      { id: 'bottle', slot: 'bottle', name: 'Garrafa PET Amassada', pts: 15, weight: 1.05, radius: 20 },
+      { id: 'bag', slot: 'bag', name: 'Sacola Plástica', pts: 10, weight: 1.0, radius: 19 },
+      { id: 'can', slot: 'can', name: 'Lata de Alumínio', pts: 20, weight: 1.25, radius: 17 },
+      { id: 'tire', slot: 'heavy', name: 'Pneu Afundado', pts: 45, weight: 2.1, radius: 23 },
+      { id: 'net', slot: 'heavy', name: 'Rede Fantasma', pts: 65, weight: 2.5, radius: 25 },
+      { id: 'barrel', slot: 'heavy', name: 'Tambor Poluente', pts: 100, weight: 3.1, radius: 27 }
+    ];
+
+    /**************************************************************
+     * 3. ESTADO DO JOGO & CAMADA AMBIENTAL DE SILHUETAS MARINHAS
+     **************************************************************/
+    const keys = {};
+    const mouse = { x: W * 0.52, y: H * 0.45 };
+
+    const game = {
+      running: true,
+      paused: true,
+      score: 0,
+      highScore: Number(localStorage.getItem('capisub_highscore') || 0),
+      trashCollected: 0,
+      monstersDefeated: 0,
+      dangerLevel: 1,
+      waveMeter: 0,
+      shakeTime: 0,
+      timeSec: 0,
+      slotCounts: { bottle: 0, bag: 0, can: 0, heavy: 0, monster: 0, puffer: 0 },
+
+      capi: {
+        x: W * 0.34,
+        y: H * 0.48,
+        vx: 0,
+        vy: 0,
+        radius: 24,
+        speed: 275,
+        facingRight: true,
+        aimAngle: 0,
+        lives: 3,
+        maxLives: 5,
+        invulnTimer: 0,
+        shieldActive: false,
+        turboTimer: 0,
+        dashTimer: 0,
+        dashCooldown: 0,
+        swimPhase: 0
+      },
+
+      harpoon: {
+        state: 'IDLE',
+        x: 0,
+        y: 0,
+        vx: 0,
+        vy: 0,
+        angle: 0,
+        maxLength: 440,
+        shootSpeed: 880,
+        baseReelSpeed: 540,
+        hookedTrash: [],
+        hookedSupplies: []
+      },
+
+      trashes: [],
+      supplies: [],
+      monsters: [],
+      projectiles: [],
+      floatTexts: [],
+      sonarWaves: [],
+      bgSilhouettes: [],
+      ambientCreatures: [],
+      bgBubbles: []
+    };
+
+    // Inicializa as Silhuetas Marinhas Azul-Marinho ao Fundo + Peixes/Tartaruga Coloridos + Bolhas Esféricas Translúcidas (Idêntico às 2 screenshots!)
+    function initOceanAmbiance() {
+      game.bgSilhouettes = [];
+      const kinds = ['TURTLE', 'OCTOPUS', 'SEAHORSE', 'FISH_SMALL', 'ANGELFISH'];
+      for (let i = 0; i < 22; i++) {
+        const k = kinds[i % kinds.length];
+        const dir = Math.random() < 0.5 ? 1 : -1;
+        game.bgSilhouettes.push({
+          kind: k,
+          x: Math.random() * W,
+          y: 45 + Math.random() * (H - 135),
+          scale: 0.45 + Math.random() * 0.65,
+          vx: dir * (8 + Math.random() * 14),
+          dir,
+          alpha: 0.25 + Math.random() * 0.22,
+          phase: Math.random() * Math.PI * 2
+        });
+      }
+
+      // Peixes e Tartaruga Coloridos Amigáveis nadando calmamente no cenário (como o peixe amarelo, o peixe azul, o laranja e a tartaruga verde da imagem!)
+      game.ambientCreatures = [
+        { kind: 'YELLOW_FISH', x: 240, y: 78, vx: 22, dir: 1, phase: 0 },
+        { kind: 'BLUE_TANG', x: 685, y: 315, vx: 18, dir: 1, phase: 1.5 },
+        { kind: 'ORANGE_FISH', x: 45, y: 265, vx: 20, dir: 1, phase: 3.1 },
+        { kind: 'GREEN_TURTLE', x: 890, y: 42, vx: -16, dir: -1, phase: 0.8 }
+      ];
+
+      // Bolhas esféricas translúcidas suaves igual às imagens
+      game.bgBubbles = [];
+      for (let i = 0; i < 11; i++) {
+        game.bgBubbles.push({
+          x: Math.random() * W,
+          y: Math.random() * H,
+          r: 5 + Math.random() * 16,
+          vy: -12 - Math.random() * 18,
+          phase: Math.random() * Math.PI * 2
+        });
+      }
+    }
+    initOceanAmbiance();
+
+    /**************************************************************
+     * 4. CONTROLES (TECLADO/MOUSE + TOUCH)
+     **************************************************************/
+    window.addEventListener('keydown', e => {
+      const k = e.key.toLowerCase();
+      keys[k] = true;
+      if (e.code) keys[e.code] = true;
+
+      if ((e.code === 'Space' || k === 'shift') && !game.paused && game.running) {
+        e.preventDefault();
+        triggerCapiDash();
+      } else if (e.key === 'Escape') {
+        document.getElementById('debugDrawer').classList.remove('active');
+      }
+    });
+
+    window.addEventListener('keyup', e => {
+      keys[e.key.toLowerCase()] = false;
+      if (e.code) keys[e.code] = false;
+    });
+
+    function setKey(k, isDown, ev) {
+      if (ev) ev.preventDefault();
+      ensureAudio();
+      keys[k] = isDown;
+    }
+
+    /* JOYSTICK ANALÓGICO VIRTUAL (MOBILE / TOUCH) — arraste o círculo central em qualquer direção (360° + diagonais) */
+    const joy = { active: false, x: 0, y: 0, pointerId: null };
+    const joyBase = document.getElementById('joyBase');
+    const joyKnob = document.getElementById('joyKnob');
+
+    function updateJoyFromEvent(ev) {
+      const rect = joyBase.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      const maxR = rect.width * 0.34;
+      let dx = ev.clientX - cx;
+      let dy = ev.clientY - cy;
+      const dist = Math.hypot(dx, dy);
+      if (dist > maxR) { dx = dx / dist * maxR; dy = dy / dist * maxR; }
+      joy.x = dx / maxR;
+      joy.y = dy / maxR;
+      joyKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+    }
+
+    function releaseJoy() {
+      joy.active = false;
+      joy.pointerId = null;
+      joy.x = 0;
+      joy.y = 0;
+      joyKnob.classList.remove('dragging');
+      joyKnob.style.transform = 'translate(0px, 0px)';
+    }
+
+    joyBase.addEventListener('pointerdown', ev => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      ensureAudio();
+      joy.active = true;
+      joy.pointerId = ev.pointerId;
+      joyBase.setPointerCapture(ev.pointerId);
+      joyKnob.classList.add('dragging');
+      updateJoyFromEvent(ev);
+    });
+    joyBase.addEventListener('pointermove', ev => {
+      if (joy.active && ev.pointerId === joy.pointerId) updateJoyFromEvent(ev);
+    });
+    ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(type => {
+      joyBase.addEventListener(type, ev => {
+        if (ev.pointerId === joy.pointerId) releaseJoy();
+      });
+    });
+
+    function updateMouseFromEvent(ev) {
+      const rect = canvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      const rawX = (ev.clientX - rect.left) * dpr;
+      const rawY = (ev.clientY - rect.top) * dpr;
+      const offsetX = (canvas.width - W * viewScale) / 2;
+      const offsetY = (canvas.height - H * viewScale) / 2;
+      mouse.x = Math.max(0, Math.min(W, (rawX - offsetX) / viewScale));
+      mouse.y = Math.max(0, Math.min(H, (rawY - offsetY) / viewScale));
+    }
+
+    canvas.addEventListener('pointermove', ev => {
+      updateMouseFromEvent(ev);
+    });
+
+    canvas.addEventListener('pointerdown', ev => {
+      ensureAudio();
+      document.getElementById('debugDrawer').classList.remove('active');
+      updateMouseFromEvent(ev);
+
+      if (ev.button === 2) {
+        triggerCapiDash();
+        return;
+      }
+      fireOrReleaseHarpoon();
+    });
+
+    function fireOrReleaseHarpoon() {
+      if (game.paused || !game.running) return;
+      const hp = game.harpoon;
+      const c = game.capi;
+
+      if (hp.state === 'IDLE') {
+        const ang = Math.atan2(mouse.y - c.y, mouse.x - c.x);
+        hp.state = 'SHOOTING';
+        hp.x = c.x + Math.cos(ang) * 26;
+        hp.y = c.y + Math.sin(ang) * 26;
+        hp.angle = ang;
+        const spd = c.turboTimer > 0 ? hp.shootSpeed * 1.45 : hp.shootSpeed;
+        hp.vx = Math.cos(ang) * spd;
+        hp.vy = Math.sin(ang) * spd;
+        hp.hookedTrash = [];
+        hp.hookedSupplies = [];
+        c.facingRight = Math.cos(ang) >= 0;
+        sfx('shoot');
+      } else if (hp.state === 'SHOOTING') {
+        hp.state = 'REELING';
+      } else if (hp.state === 'REELING' && hp.hookedTrash.length > 0) {
+        hp.hookedTrash.forEach(t => { t.hooked = false; });
+        hp.hookedTrash = [];
+        spawnFloatText(c.x, c.y - 34, 'CORDA SOLTA!', '#fde047');
+        sfx('cut');
+      }
+    }
+
+    function triggerCapiDash() {
+      if (game.paused || !game.running) return;
+      const c = game.capi;
+      if (c.dashCooldown > 0) return;
+
+      c.dashTimer = 0.26;
+      c.dashCooldown = 2.4;
+      c.invulnTimer = Math.max(c.invulnTimer, 0.35);
+
+      let dx = 0, dy = 0;
+      if (keys['w'] || keys['arrowup'] || keys['KeyW']) dy -= 1;
+      if (keys['s'] || keys['arrowdown'] || keys['KeyS']) dy += 1;
+      if (keys['a'] || keys['arrowleft'] || keys['KeyA']) dx -= 1;
+      if (keys['d'] || keys['arrowright'] || keys['KeyD']) dx += 1;
+      if (joy.active && Math.hypot(joy.x, joy.y) > 0.15) { dx = joy.x; dy = joy.y; }
+
+      const ang = (dx !== 0 || dy !== 0) ? Math.atan2(dy, dx) : Math.atan2(mouse.y - c.y, mouse.x - c.x);
+      c.vx = Math.cos(ang) * 620;
+      c.vy = Math.sin(ang) * 620;
+      c.facingRight = Math.cos(ang) >= 0;
+
+      spawnFloatText(c.x, c.y - 32, '💨 CAPI-DASH!', '#e0f2fe');
+      sfx('dash');
+    }
+
+    /**************************************************************
+     * 5. GERAÇÃO DE LIXOS, VIDAS EXTRAS (❤️) E MONSTROS
+     **************************************************************/
+    function getDangerLevelFromScore(sc) {
+      if (sc < 300) return 1;
+      if (sc < 800) return 2;
+      if (sc < 1500) return 3;
+      if (sc < 2500) return 4;
+      return 5;
+    }
+
+    function recordDockSlot(slotKey) {
+      if (game.slotCounts[slotKey] !== undefined) {
+        game.slotCounts[slotKey]++;
+        const countEl = document.getElementById(`count-${slotKey}`);
+        const slotEl = document.getElementById(`slot-${slotKey}`);
+        if (countEl) countEl.textContent = String(game.slotCounts[slotKey]);
+        if (slotEl) slotEl.classList.add('collected');
+      }
+    }
+
+    function resetDockSlots() {
+      Object.keys(game.slotCounts).forEach(k => {
+        game.slotCounts[k] = 0;
+        const countEl = document.getElementById(`count-${k}`);
+        const slotEl = document.getElementById(`slot-${k}`);
+        if (countEl) countEl.textContent = '0';
+        if (slotEl) slotEl.classList.remove('collected');
+      });
+    }
+
+    function spawnTrashItem() {
+      const lvl = game.dangerLevel;
+      let pool = TRASH_TYPES.slice(0, 3);
+      if (lvl === 2) pool = TRASH_TYPES.slice(0, 5);
+      else if (lvl >= 3) pool = TRASH_TYPES;
+
+      const tpl = pool[Math.floor(Math.random() * pool.length)];
+      const fromSide = Math.random() < 0.38;
+      let x, y, vx, vy;
+
+      if (!fromSide) {
+        x = 90 + Math.random() * (W - 180);
+        y = -25;
+        vx = (Math.random() - 0.5) * 26;
+        vy = 22 + Math.random() * 24 + lvl * 3.5;
+      } else {
+        const left = Math.random() < 0.5;
+        x = left ? -25 : W + 25;
+        y = 80 + Math.random() * (H - 220);
+        vx = (left ? 1 : -1) * (30 + Math.random() * 26);
+        vy = 8 + Math.random() * 14;
+      }
+
+      game.trashes.push({
+        ...tpl,
+        uid: Math.random(),
+        x, y, vx, vy,
+        rot: (Math.random() - 0.5) * 0.7,
+        rotSpd: (Math.random() - 0.5) * 0.55,
+        hooked: false
+      });
+    }
+
+    function spawnHeartSupply(customX = null, customY = null) {
+      document.getElementById('debugDrawer').classList.remove('active');
+      const left = Math.random() < 0.5;
+      game.supplies.push({
+        kind: 'HEART',
+        x: customX !== null ? customX : (left ? -20 : W + 20),
+        y: customY !== null ? customY : (100 + Math.random() * (H - 230)),
+        vx: customX !== null ? 0 : (left ? 48 : -48),
+        vy: -5,
+        radius: 20,
+        hooked: false,
+        phase: Math.random() * 6
+      });
+    }
+
+    function spawnPowerupSupply(pKind = null) {
+      document.getElementById('debugDrawer').classList.remove('active');
+      let kind = pKind;
+      if (!kind) {
+        if (game.score >= 800 && Math.random() < 0.22) kind = 'SONAR';
+        else kind = Math.random() < 0.5 ? 'TURBO' : 'SHIELD';
+      }
+      const left = Math.random() < 0.5;
+      game.supplies.push({
+        kind,
+        x: left ? -20 : W + 20,
+        y: 105 + Math.random() * (H - 235),
+        vx: left ? 52 : -52,
+        vy: 0,
+        radius: 20,
+        hooked: false,
+        phase: Math.random() * 6
+      });
+    }
+
+    function spawnMonster(forcedKind = null) {
+      const lvl = game.dangerLevel;
+      let kind = forcedKind;
+      if (!kind) {
+        const allowed = ['JELLY'];
+        if (lvl >= 2) allowed.push('CRAB', 'PUFFER');
+        if (lvl >= 3) allowed.push('EEL');
+        if (game.score >= 2000 && !game.monsters.some(m => m.kind === 'KRAKEN')) {
+          allowed.push('KRAKEN');
+        }
+        kind = allowed[Math.floor(Math.random() * allowed.length)];
+      }
+
+      const fromLeft = Math.random() < 0.5;
+      const x = fromLeft ? -36 : W + 36;
+      const y = 85 + Math.random() * (H - 205);
+      const speedMult = 1 + (lvl - 1) * 0.14;
+
+      if (kind === 'JELLY') {
+        game.monsters.push({
+          kind: 'JELLY',
+          slot: 'monster',
+          name: 'Medusa-Tóxica',
+          hp: 1,
+          maxHp: 1,
+          pts: 30,
+          x, y,
+          vx: (fromLeft ? 1 : -1) * (58 + Math.random() * 32) * speedMult,
+          vy: 0,
+          baseY: y,
+          radius: 20,
+          phase: Math.random() * Math.PI * 2,
+          stunTimer: 0,
+          hitFlash: 0
+        });
+      } else if (kind === 'PUFFER') {
+        game.monsters.push({
+          kind: 'PUFFER',
+          slot: 'puffer',
+          name: 'Baiacu-Espinhoso',
+          hp: 3,
+          maxHp: 3,
+          pts: 120,
+          x, y: Math.max(105, Math.min(H - 185, y)),
+          vx: (fromLeft ? 1 : -1) * 45 * speedMult,
+          vy: 0,
+          radius: 28,
+          shootTimer: 2.5,
+          puffedTimer: 0,
+          phase: 0,
+          stunTimer: 0,
+          hitFlash: 0
+        });
+      } else if (kind === 'CRAB') {
+        game.monsters.push({
+          kind: 'CRAB',
+          slot: 'monster',
+          name: 'Caranguejo-Sucata',
+          hp: 2,
+          maxHp: 2,
+          pts: 60,
+          x, y,
+          vx: (fromLeft ? 1 : -1) * 72 * speedMult,
+          vy: 0,
+          radius: 22,
+          phase: 0,
+          stunTimer: 0,
+          hitFlash: 0
+        });
+      } else if (kind === 'EEL') {
+        game.monsters.push({
+          kind: 'EEL',
+          slot: 'monster',
+          name: 'Enguia de Óleo',
+          hp: 2,
+          maxHp: 2,
+          pts: 75,
+          x, y,
+          vx: (fromLeft ? 1 : -1) * 60,
+          vy: 0,
+          radius: 21,
+          state: 'PATROL',
+          stateTimer: 1.5,
+          dashAngle: 0,
+          phase: 0,
+          stunTimer: 0,
+          hitFlash: 0
+        });
+      } else if (kind === 'KRAKEN') {
+        game.monsters.push({
+          kind: 'KRAKEN',
+          slot: 'monster',
+          name: 'Kraken Abissal',
+          hp: 5,
+          maxHp: 5,
+          pts: 0,
+          x: W * 0.5 + (Math.random() - 0.5) * 260,
+          y: H + 60,
+          targetY: H * 0.5 + (Math.random() - 0.5) * 120,
+          vx: (fromLeft ? 1 : -1) * 38,
+          vy: 0,
+          radius: 42,
+          whirlpoolCooldown: 3.2,
+          whirlpoolTimer: 0,
+          whirlpoolX: W * 0.5,
+          whirlpoolY: H * 0.5,
+          tentacleCooldown: 0.9,
+          tentacles: [],
+          phase: 0,
+          stunTimer: 0,
+          hitFlash: 0
+        });
+        spawnFloatText(W / 2, 115, '🐙 KRAKEN ABISSAL DE DETRITOS SURGIU!', '#fca5a5');
+      }
+    }
+
+    function forceSpawnMonster(k) {
+      document.getElementById('debugDrawer').classList.remove('active');
+      spawnMonster(k);
+    }
+
+    function addDemoScore(pts) {
+      document.getElementById('debugDrawer').classList.remove('active');
+      addScore(pts, game.capi.x, game.capi.y - 30);
+    }
+
+    function spawnFloatText(x, y, text, color = '#ffffff') {
+      game.floatTexts.push({ x, y, text, color, life: 1.15, maxLife: 1.15 });
+    }
+
+    function addScore(pts, fx, fy) {
+      const oldLvl = game.dangerLevel;
+      game.score += pts;
+      if (game.score > game.highScore) {
+        game.highScore = game.score;
+        localStorage.setItem('capisub_highscore', String(game.highScore));
+      }
+      game.dangerLevel = getDangerLevelFromScore(game.score);
+
+      game.waveMeter += pts * 0.45;
+      if (game.waveMeter >= 100) {
+        game.waveMeter -= 100;
+        spawnMonster(game.dangerLevel >= 2 ? 'PUFFER' : 'JELLY');
+        spawnMonster(game.dangerLevel >= 3 ? 'EEL' : 'CRAB');
+        spawnHeartSupply();
+        spawnFloatText(W / 2, 110, '🌊 CORRENTEZA FORTE + ❤️ VIDA EXTRA NO MAR!', '#bae6fd');
+      }
+
+      if (game.dangerLevel > oldLvl) {
+        spawnFloatText(W / 2, 145, `⚡ NÍVEL DE PROFUNDIDADE ${game.dangerLevel} ALCANÇADO!`, '#fde047');
+      }
+      updateTopHUD();
+    }
+
+    function damageCapi() {
+      const c = game.capi;
+      if (c.invulnTimer > 0) return;
+
+      if (c.shieldActive) {
+        c.shieldActive = false;
+        c.invulnTimer = 1.6;
+        game.shakeTime = 0.22;
+        sfx('dash');
+        spawnFloatText(c.x, c.y - 35, '🫧 ESCUDO PROTEGEU!', '#bae6fd');
+        return;
+      }
+
+      c.lives = Math.max(0, c.lives - 1);
+      c.invulnTimer = 2.0;
+      game.shakeTime = 0.32;
+      sfx('hit');
+      spawnFloatText(c.x, c.y - 35, '💔 -1 VIDA!', '#fca5a5');
+      updateTopHUD();
+
+      if (c.lives <= 0) {
+        triggerGameOver();
+      }
+    }
+
+    /**************************************************************
+     * 6. ATUALIZAÇÃO FÍSICA (LOOP DE GAMEPLAY ENDLESS)
+     **************************************************************/
+    let trashSpawnTimer = 0.5;
+    let monsterSpawnTimer = 1.2;
+    let supplySpawnTimer = 9.0;
+
+    function updateGame(dt) {
+      if (!game.running || game.paused) return;
+      game.timeSec += dt;
+      if (game.shakeTime > 0) game.shakeTime = Math.max(0, game.shakeTime - dt);
+
+      // Atualiza silhuetas marinhas de fundo, peixes amigáveis e bolhas translúcidas
+      game.bgSilhouettes.forEach(s => {
+        s.x += s.vx * dt;
+        s.phase += dt * 1.5;
+        if (s.vx > 0 && s.x > W + 60) s.x = -60;
+        if (s.vx < 0 && s.x < -60) s.x = W + 60;
+      });
+
+      game.ambientCreatures.forEach(ac => {
+        ac.x += ac.vx * dt;
+        ac.phase += dt * 3;
+        if (ac.vx > 0 && ac.x > W + 70) ac.x = -70;
+        if (ac.vx < 0 && ac.x < -70) ac.x = W + 70;
+      });
+
+      game.bgBubbles.forEach(b => {
+        b.y += b.vy * dt;
+        b.phase += dt * 2;
+        b.x += Math.sin(b.phase) * 8 * dt;
+        if (b.y < -30) {
+          b.y = H + 25;
+          b.x = Math.random() * W;
+        }
+      });
+
+      const c = game.capi;
+      const hp = game.harpoon;
+
+      if (c.invulnTimer > 0) c.invulnTimer = Math.max(0, c.invulnTimer - dt);
+      if (c.turboTimer > 0) c.turboTimer = Math.max(0, c.turboTimer - dt);
+      if (c.dashCooldown > 0) c.dashCooldown = Math.max(0, c.dashCooldown - dt);
+
+      c.aimAngle = Math.atan2(mouse.y - c.y, mouse.x - c.x);
+
+      if (c.dashTimer > 0) {
+        c.dashTimer -= dt;
+        c.x += c.vx * dt;
+        c.y += c.vy * dt;
+        c.swimPhase += dt * 18;
+      } else {
+        let ix = 0, iy = 0;
+        if (keys['w'] || keys['arrowup'] || keys['KeyW'] || keys['ArrowUp']) iy -= 1;
+        if (keys['s'] || keys['arrowdown'] || keys['KeyS'] || keys['ArrowDown']) iy += 1;
+        if (keys['a'] || keys['arrowleft'] || keys['KeyA'] || keys['ArrowLeft']) ix -= 1;
+        if (keys['d'] || keys['arrowright'] || keys['KeyD'] || keys['ArrowRight']) ix += 1;
+
+        // Joystick analógico tem prioridade quando está sendo arrastado
+        if (joy.active && Math.hypot(joy.x, joy.y) > 0.15) {
+          ix = joy.x;
+          iy = joy.y;
+        }
+
+        let weightPenalty = 1.0;
+        if (hp.state === 'REELING' && hp.hookedTrash.length > 0 && c.turboTimer <= 0) {
+          const totalW = hp.hookedTrash.reduce((acc, t) => acc + t.weight, 0);
+          weightPenalty = Math.max(0.58, 1.0 - (totalW - 1) * 0.14);
+        }
+
+        if (ix !== 0 || iy !== 0) {
+          const len = Math.hypot(ix, iy);
+          if (len > 1) { ix /= len; iy /= len; }
+          const targetVx = ix * c.speed * weightPenalty;
+          const targetVy = iy * c.speed * weightPenalty;
+          c.vx += (targetVx - c.vx) * Math.min(1, dt * 10);
+          c.vy += (targetVy - c.vy) * Math.min(1, dt * 10);
+          if (Math.abs(ix) > 0.1) c.facingRight = ix > 0;
+          c.swimPhase += dt * 10;
+        } else {
+          c.vx *= Math.pow(0.08, dt);
+          c.vy *= Math.pow(0.08, dt);
+          c.swimPhase += dt * 3.5;
+        }
+
+        c.x += c.vx * dt;
+        c.y += c.vy * dt;
+      }
+
+      c.x = Math.max(42, Math.min(W - 42, c.x));
+      c.y = Math.max(62, Math.min(H - 85, c.y));
+
+      // 2. Atualização do Arpão com Corda Retrátil
+      const maxLen = c.turboTimer > 0 ? hp.maxLength * 1.35 : hp.maxLength;
+      if (hp.state === 'SHOOTING') {
+        hp.x += hp.vx * dt;
+        hp.y += hp.vy * dt;
+
+        // Colisão com Resíduos
+        game.trashes.forEach(t => {
+          if (!t.hooked && Math.hypot(hp.x - t.x, hp.y - t.y) < t.radius + 14) {
+            t.hooked = true;
+            hp.hookedTrash.push(t);
+            sfx('hook');
+            if (t.weight >= 2.0 || hp.hookedTrash.length >= 3) {
+              hp.state = 'REELING';
+            }
+          }
+        });
+
+        // Colisão com Vidas Extras (❤️) e Power-ups
+        game.supplies.forEach(s => {
+          if (!s.hooked && Math.hypot(hp.x - s.x, hp.y - s.y) < s.radius + 16) {
+            s.hooked = true;
+            hp.hookedSupplies.push(s);
+            sfx('hook');
+            hp.state = 'REELING';
+          }
+        });
+
+        // Colisão com Monstros (Causa dano e permite derrotá-los!)
+        for (let mi = game.monsters.length - 1; mi >= 0; mi--) {
+          const m = game.monsters[mi];
+          if (Math.hypot(hp.x - m.x, hp.y - m.y) < m.radius + 14) {
+            const dmg = c.turboTimer > 0 ? 2 : 1;
+            m.hp -= dmg;
+            m.hitFlash = 0.22;
+            const pushAng = Math.atan2(m.y - c.y, m.x - c.x);
+            m.x += Math.cos(pushAng) * 26;
+            m.y += Math.sin(pushAng) * 26;
+
+            if (m.hp <= 0) {
+              game.monstersDefeated++;
+              recordDockSlot(m.slot || 'monster');
+              sfx('kill');
+              game.shakeTime = 0.15;
+              // Derrotar monstros NÃO dá pontos: o objetivo é coletar lixo. A recompensa é sobreviver (e chance de ❤️).
+              spawnFloatText(m.x, m.y - 26, `💥 ${m.name.toUpperCase()} DERROTADO!`, '#bae6fd');
+
+              if (m.kind === 'PUFFER' || m.kind === 'KRAKEN' || Math.random() < 0.25) {
+                spawnHeartSupply(m.x, m.y);
+              }
+              game.monsters.splice(mi, 1);
+            } else {
+              m.stunTimer = 0.75;
+              sfx('hook');
+              spawnFloatText(m.x, m.y - 26, `⚔️ -${dmg} HP (${m.hp}/${m.maxHp})`, '#bae6fd');
+            }
+
+            hp.state = 'REELING';
+            break;
+          }
+        }
+
+        if (Math.hypot(hp.x - c.x, hp.y - c.y) >= maxLen || hp.x < 12 || hp.x > W - 12 || hp.y < 15 || hp.y > H - 15) {
+          hp.state = 'REELING';
+        }
+      } else if (hp.state === 'REELING') {
+        const dx = c.x - hp.x;
+        const dy = c.y - hp.y;
+        const dist = Math.hypot(dx, dy);
+
+        let totalWeight = 1.0;
+        if (hp.hookedTrash.length > 0 && c.turboTimer <= 0) {
+          totalWeight = hp.hookedTrash.reduce((acc, t) => acc + (t.weight - 0.35), 0.35);
+        }
+        const reelSpd = (c.turboTimer > 0 ? hp.baseReelSpeed * 1.7 : hp.baseReelSpeed) / Math.max(0.85, totalWeight);
+
+        if (dist <= 28) {
+          if (hp.hookedTrash.length > 0) {
+            const comboMult = hp.hookedTrash.length;
+            let baseSum = 0;
+            hp.hookedTrash.forEach(t => {
+              baseSum += t.pts;
+              game.trashCollected++;
+              recordDockSlot(t.slot);
+              const idx = game.trashes.indexOf(t);
+              if (idx !== -1) game.trashes.splice(idx, 1);
+            });
+            const finalPts = baseSum * comboMult;
+            const comboTxt = comboMult > 1 ? ` (COMBO x${comboMult}!)` : '';
+            spawnFloatText(c.x, c.y - 34, `+${finalPts} PTS${comboTxt}`, '#fde047');
+            sfx('collect');
+            addScore(finalPts, c.x, c.y);
+          }
+
+          if (hp.hookedSupplies.length > 0) {
+            hp.hookedSupplies.forEach(s => {
+              collectSupplyItem(s);
+              const idx = game.supplies.indexOf(s);
+              if (idx !== -1) game.supplies.splice(idx, 1);
+            });
+          }
+
+          hp.hookedTrash = [];
+          hp.hookedSupplies = [];
+          hp.state = 'IDLE';
+        } else {
+          const ux = dx / dist;
+          const uy = dy / dist;
+          hp.x += ux * reelSpd * dt;
+          hp.y += uy * reelSpd * dt;
+          hp.angle = Math.atan2(-dy, -dx);
+
+          hp.hookedTrash.forEach((t, i) => {
+            t.x = hp.x - ux * (i * 18);
+            t.y = hp.y - uy * (i * 18);
+          });
+          hp.hookedSupplies.forEach(s => {
+            s.x = hp.x;
+            s.y = hp.y;
+          });
+        }
+      }
+
+      // 3. Atualização dos Resíduos
+      trashSpawnTimer -= dt;
+      const maxTrashes = 7 + game.dangerLevel * 2;
+      if (trashSpawnTimer <= 0 && game.trashes.length < maxTrashes) {
+        spawnTrashItem();
+        trashSpawnTimer = Math.max(0.65, 1.75 - game.dangerLevel * 0.18);
+      }
+
+      for (let i = game.trashes.length - 1; i >= 0; i--) {
+        const t = game.trashes[i];
+        if (!t.hooked) {
+          t.x += t.vx * dt;
+          t.y += t.vy * dt;
+          t.rot += t.rotSpd * dt * 0.35;
+          if (t.y > H + 45 || t.x < -70 || t.x > W + 70) {
+            game.trashes.splice(i, 1);
+          }
+        }
+      }
+
+      // 4. Atualização de Vidas Extras (❤️) e Power-ups
+      supplySpawnTimer -= dt;
+      if (supplySpawnTimer <= 0) {
+        if (c.lives < c.maxLives || Math.random() < 0.6) {
+          spawnHeartSupply();
+        } else {
+          spawnPowerupSupply();
+        }
+        supplySpawnTimer = 11 + Math.random() * 5;
+      }
+
+      for (let i = game.supplies.length - 1; i >= 0; i--) {
+        const s = game.supplies[i];
+        if (!s.hooked) {
+          s.phase += dt * 3.5;
+          s.x += s.vx * dt;
+          s.y += Math.sin(s.phase) * 20 * dt;
+
+          if (Math.hypot(c.x - s.x, c.y - s.y) < c.radius + s.radius) {
+            collectSupplyItem(s);
+            game.supplies.splice(i, 1);
+            continue;
+          }
+          if (s.x < -60 || s.x > W + 60) {
+            game.supplies.splice(i, 1);
+          }
+        }
+      }
+
+      // 5. Atualização dos Monstros
+      monsterSpawnTimer -= dt;
+      const maxMonsters = 2 + game.dangerLevel * 2;
+      if (monsterSpawnTimer <= 0 && game.monsters.length < maxMonsters) {
+        spawnMonster();
+        monsterSpawnTimer = Math.max(0.9, 2.8 - game.dangerLevel * 0.35);
+      }
+
+      for (let i = game.monsters.length - 1; i >= 0; i--) {
+        const m = game.monsters[i];
+        m.phase += dt * 4;
+        if (m.hitFlash > 0) m.hitFlash = Math.max(0, m.hitFlash - dt);
+
+        if (m.stunTimer > 0) {
+          m.stunTimer -= dt;
+          continue;
+        }
+
+        if (m.kind === 'JELLY') {
+          m.x += m.vx * dt;
+          m.y = m.baseY + Math.sin(m.phase) * 38;
+        } else if (m.kind === 'PUFFER') {
+          m.x += m.vx * dt;
+          m.y += Math.sin(m.phase * 0.6) * 18 * dt;
+          if (m.puffedTimer > 0) m.puffedTimer -= dt;
+
+          m.shootTimer -= dt;
+          if (m.shootTimer <= 0) {
+            m.shootTimer = Math.max(2.0, 3.4 - game.dangerLevel * 0.2);
+            m.puffedTimer = 0.65;
+            const angles = [Math.PI * 0.25, Math.PI * 0.75, Math.PI * 1.25, Math.PI * 1.75];
+            angles.forEach(a => {
+              game.projectiles.push({
+                x: m.x + Math.cos(a) * 26,
+                y: m.y + Math.sin(a) * 26,
+                vx: Math.cos(a) * 190,
+                vy: Math.sin(a) * 190,
+                angle: a,
+                radius: 8
+              });
+            });
+          }
+        } else if (m.kind === 'CRAB') {
+          if (hp.state !== 'IDLE' && hp.hookedTrash.length > 0) {
+            const midX = (c.x + hp.x) * 0.5;
+            const midY = (c.y + hp.y) * 0.5;
+            const ang = Math.atan2(midY - m.y, midX - m.x);
+            m.x += Math.cos(ang) * 125 * dt;
+            m.y += Math.sin(ang) * 125 * dt;
+
+            if (distToSegment(m.x, m.y, c.x, c.y, hp.x, hp.y) < m.radius + 6) {
+              hp.hookedTrash.forEach(t => { t.hooked = false; });
+              hp.hookedTrash = [];
+              sfx('cut');
+              spawnFloatText(m.x, m.y - 26, '✂️ CORDA CORTADA!', '#fde047');
+            }
+          } else {
+            m.x += m.vx * dt;
+            m.y += Math.sin(m.phase) * 28 * dt;
+          }
+        } else if (m.kind === 'EEL') {
+          if (m.state === 'PATROL') {
+            m.x += m.vx * dt;
+            m.stateTimer -= dt;
+            if (m.stateTimer <= 0 && m.x > 80 && m.x < W - 80) {
+              m.state = 'AIMING';
+              m.stateTimer = 0.85;
+              m.dashAngle = Math.atan2(c.y - m.y, c.x - m.x);
+            }
+          } else if (m.state === 'AIMING') {
+            m.dashAngle = Math.atan2(c.y - m.y, c.x - m.x);
+            m.stateTimer -= dt;
+            if (m.stateTimer <= 0) {
+              m.state = 'DASHING';
+              m.stateTimer = 0.9;
+            }
+          } else if (m.state === 'DASHING') {
+            m.x += Math.cos(m.dashAngle) * 350 * dt;
+            m.y += Math.sin(m.dashAngle) * 350 * dt;
+            m.stateTimer -= dt;
+            if (m.stateTimer <= 0) {
+              m.state = 'PATROL';
+              m.stateTimer = 1.8;
+            }
+          }
+        } else if (m.kind === 'KRAKEN') {
+          // Entra pela base da tela e patrulha
+          if (m.y > m.targetY) {
+            m.y += (m.targetY - m.y) * Math.min(1, dt * 2.5);
+          } else {
+            m.x += m.vx * dt;
+            m.y += Math.sin(m.phase * 0.5) * 22 * dt;
+            if (m.x < 140) m.vx = Math.abs(m.vx);
+            if (m.x > W - 140) m.vx = -Math.abs(m.vx);
+          }
+
+          // 1. Tentáculos gigantes emergem das laterais ou do fundo tentando varrer a área da capivara
+          m.tentacleCooldown -= dt;
+          if (m.tentacleCooldown <= 0 && m.tentacles.length < 2) {
+            m.tentacleCooldown = 2.1;
+            const edges = ['LEFT', 'RIGHT', 'BOTTOM'];
+            const edge = edges[Math.floor(Math.random() * edges.length)];
+            let baseX, baseY, sweepA0, sweepA1, len;
+            if (edge === 'LEFT') {
+              baseX = -15;
+              baseY = Math.max(100, Math.min(H - 120, c.y + (Math.random() - 0.5) * 80));
+              const aim = Math.atan2(c.y - baseY, c.x - baseX);
+              sweepA0 = aim - 0.42;
+              sweepA1 = aim + 0.42;
+              len = 360 + Math.random() * 120;
+            } else if (edge === 'RIGHT') {
+              baseX = W + 15;
+              baseY = Math.max(100, Math.min(H - 120, c.y + (Math.random() - 0.5) * 80));
+              const aim = Math.atan2(c.y - baseY, c.x - baseX);
+              sweepA0 = aim - 0.42;
+              sweepA1 = aim + 0.42;
+              len = 360 + Math.random() * 120;
+            } else {
+              baseX = Math.max(130, Math.min(W - 130, c.x + (Math.random() - 0.5) * 100));
+              baseY = H + 15;
+              const aim = Math.atan2(c.y - baseY, c.x - baseX);
+              sweepA0 = aim - 0.45;
+              sweepA1 = aim + 0.45;
+              len = 320 + Math.random() * 110;
+            }
+            if (Math.random() < 0.5) { const tmp = sweepA0; sweepA0 = sweepA1; sweepA1 = tmp; }
+            m.tentacles.push({
+              baseX, baseY, len,
+              angle: sweepA0,
+              sweepA0, sweepA1,
+              state: 'WARN', // 'WARN' -> 'SWEEP' -> 'RETRACT'
+              timer: 0.95,
+              extend: 0
+            });
+          }
+
+          for (let ti = m.tentacles.length - 1; ti >= 0; ti--) {
+            const tt = m.tentacles[ti];
+            tt.timer -= dt;
+            if (tt.state === 'WARN') {
+              if (tt.timer <= 0) {
+                tt.state = 'SWEEP';
+                tt.timer = 1.6;
+              }
+            } else if (tt.state === 'SWEEP') {
+              const p = Math.max(0, Math.min(1, 1 - tt.timer / 1.6));
+              tt.extend = Math.min(1, p * 3.5);
+              tt.angle = tt.sweepA0 + (tt.sweepA1 - tt.sweepA0) * p;
+              const tipX = tt.baseX + Math.cos(tt.angle) * tt.len * tt.extend;
+              const tipY = tt.baseY + Math.sin(tt.angle) * tt.len * tt.extend;
+              if (distToSegment(c.x, c.y, tt.baseX, tt.baseY, tipX, tipY) < c.radius + 15) {
+                damageCapi();
+              }
+              if (tt.timer <= 0) {
+                tt.state = 'RETRACT';
+                tt.timer = 0.55;
+              }
+            } else if (tt.state === 'RETRACT') {
+              tt.extend = Math.max(0, tt.timer / 0.55);
+              if (tt.timer <= 0) m.tentacles.splice(ti, 1);
+            }
+          }
+
+          // 2. Redemoinhos que puxam o jogador E espalham os lixos pela tela
+          if (m.whirlpoolTimer > 0) {
+            m.whirlpoolTimer -= dt;
+            const wx = m.whirlpoolX;
+            const wy = m.whirlpoolY;
+            const dxC = wx - c.x;
+            const dyC = wy - c.y;
+            const distC = Math.hypot(dxC, dyC);
+            if (distC > 22 && distC < 340 && c.dashTimer <= 0) {
+              c.x += (dxC / distC) * 95 * dt;
+              c.y += (dyC / distC) * 95 * dt;
+            }
+            game.trashes.forEach(t => {
+              if (!t.hooked) {
+                const dxT = t.x - wx;
+                const dyT = t.y - wy;
+                const distT = Math.max(18, Math.hypot(dxT, dyT));
+                if (distT < 320) {
+                  // Espalha os lixos para fora e em espiral
+                  const ux = dxT / distT;
+                  const uy = dyT / distT;
+                  t.x += (ux * 115 - uy * 85) * dt;
+                  t.y += (uy * 115 + ux * 85) * dt;
+                }
+              }
+            });
+          } else {
+            m.whirlpoolCooldown -= dt;
+            if (m.whirlpoolCooldown <= 0) {
+              m.whirlpoolCooldown = 4.6;
+              m.whirlpoolTimer = 2.6;
+              m.whirlpoolX = Math.max(180, Math.min(W - 180, c.x + (Math.random() - 0.5) * 180));
+              m.whirlpoolY = Math.max(140, Math.min(H - 160, c.y + (Math.random() - 0.5) * 120));
+            }
+          }
+        }
+
+        const hitR = (m.kind === 'PUFFER' && m.puffedTimer > 0) ? m.radius * 1.25 : m.radius;
+        if (Math.hypot(c.x - m.x, c.y - m.y) < c.radius + hitR - 4) {
+          damageCapi();
+        }
+
+        if (m.x < -110 || m.x > W + 110 || m.y < -110 || m.y > H + 110) {
+          game.monsters.splice(i, 1);
+        }
+      }
+
+      // 6. Atualização dos Espinhos
+      for (let i = game.projectiles.length - 1; i >= 0; i--) {
+        const p = game.projectiles[i];
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        if (Math.hypot(c.x - p.x, c.y - p.y) < c.radius + p.radius - 2) {
+          game.projectiles.splice(i, 1);
+          damageCapi();
+          continue;
+        }
+        if (p.x < -30 || p.x > W + 30 || p.y < -30 || p.y > H + 30) {
+          game.projectiles.splice(i, 1);
+        }
+      }
+
+      // 7. Textos Flutuantes e Ondas Sonar
+      for (let i = game.floatTexts.length - 1; i >= 0; i--) {
+        const ft = game.floatTexts[i];
+        ft.y -= 32 * dt;
+        ft.life -= dt;
+        if (ft.life <= 0) game.floatTexts.splice(i, 1);
+      }
+
+      for (let i = game.sonarWaves.length - 1; i >= 0; i--) {
+        const sw = game.sonarWaves[i];
+        sw.r += 560 * dt;
+        sw.life -= dt;
+        if (sw.life <= 0) game.sonarWaves.splice(i, 1);
+      }
+    }
+
+    function collectSupplyItem(s) {
+      const c = game.capi;
+      if (s.kind === 'HEART') {
+        sfx('heart');
+        if (c.lives < c.maxLives) {
+          c.lives++;
+          updateTopHUD();
+          spawnFloatText(c.x, c.y - 36, '❤️ +1 VIDA EXTRA!', '#ffffff');
+        } else {
+          addScore(75, c.x, c.y);
+          spawnFloatText(c.x, c.y - 36, '❤️ VIDAS CHEIAS! +75 PTS!', '#fde047');
+        }
+      } else if (s.kind === 'TURBO') {
+        sfx('heart');
+        c.turboTimer = 8.0;
+        spawnFloatText(c.x, c.y - 36, '⚡ CARRETILHA TURBO (8s)!', '#fde047');
+      } else if (s.kind === 'SHIELD') {
+        sfx('heart');
+        c.shieldActive = true;
+        spawnFloatText(c.x, c.y - 36, '🫧 ESCUDO DE BOLHA ATIVO!', '#ffffff');
+      } else if (s.kind === 'SONAR') {
+        playTone(880, 'sine', 0.2, 0.38, 392);
+        game.sonarWaves.push({ x: c.x, y: c.y, r: 24, life: 0.9, maxLife: 0.9 });
+        game.sonarWaves.push({ x: c.x, y: c.y, r: 6, life: 1.05, maxLife: 1.05 });
+        game.projectiles = [];
+        game.monsters.forEach(m => {
+          m.stunTimer = Math.max(m.stunTimer, 4.0);
+          const ang = Math.atan2(m.y - c.y, m.x - c.x);
+          m.x = Math.max(30, Math.min(W - 30, m.x + Math.cos(ang) * 115));
+          m.y = Math.max(60, Math.min(H - 80, m.y + Math.sin(ang) * 115));
+        });
+        spawnFloatText(c.x, c.y - 36, '🔊 ONDA SONAR! MONSTROS ATORDOADOS (4s)!', '#67e8f9');
+      }
+    }
+
+    function distToSegment(px, py, x1, y1, x2, y2) {
+      const l2 = (x2 - x1) ** 2 + (y2 - y1) ** 2;
+      if (l2 === 0) return Math.hypot(px - x1, py - y1);
+      let t = ((px - x1) * (x2 - x1) + (py - y1) * (y2 - y1)) / l2;
+      t = Math.max(0, Math.min(1, t));
+      return Math.hypot(px - (x1 + t * (x2 - x1)), py - (y1 + t * (y2 - y1)));
+    }
+
+    /**************************************************************
+     * 7. RENDERIZAÇÃO 2D ESTILO OCEANO (UNITY)
+     * - Gradiente Azul Oceânico Limpo (#0298db -> #0977b0 -> #2e8b9a)
+     * - Silhuetas Marinhas Azul-Marinho Translúcidas ao Fundo (Tartarugas, Polvos, Cavalos-Marinhos, Peixes)
+     * - Bolhas Esféricas Translúcidas e Peixes/Tartaruga Coloridos
+     * - Arte Vetorial Sem Contorno Preto Grosso (Garrafa PET Amassada idêntica à foto!)
+     * - Mira Reticular Branca [ ( • ) ] de Enquadramento
+     **************************************************************/
+    function drawGame() {
+      ctx.save();
+
+      // 1. Gradiente Oceânico Idêntico às Screenshots de OCEANO
+      const bgGrad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+      bgGrad.addColorStop(0, '#0298db');
+      bgGrad.addColorStop(0.58, '#0977b0');
+      bgGrad.addColorStop(0.88, '#1d81a2');
+      bgGrad.addColorStop(1, '#368d95');
+      ctx.fillStyle = bgGrad;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      const offsetX = (canvas.width - W * viewScale) / 2;
+      const offsetY = (canvas.height - H * viewScale) / 2;
+      ctx.translate(offsetX, offsetY);
+      ctx.scale(viewScale, viewScale);
+
+      if (game.shakeTime > 0) {
+        ctx.translate((Math.random() - 0.5) * 9, (Math.random() - 0.5) * 9);
+      }
+
+      // 2. Silhuetas Marinhas Azul-Marinho ao Fundo (Tartarugas, Polvos, Cavalos-Marinhos e Cardumes — Idênticas às imagens!)
+      game.bgSilhouettes.forEach(s => drawMarineSilhouette(s));
+
+      // 3. Bolhas Esféricas Translúcidas Suaves (Idênticas às esferas translúcidas das imagens!)
+      game.bgBubbles.forEach(b => {
+        ctx.save();
+        const radGrad = ctx.createRadialGradient(b.x - b.r * 0.3, b.y - b.r * 0.3, b.r * 0.1, b.x, b.y, b.r);
+        radGrad.addColorStop(0, 'rgba(240, 249, 255, 0.72)');
+        radGrad.addColorStop(0.7, 'rgba(186, 220, 255, 0.42)');
+        radGrad.addColorStop(1, 'rgba(147, 197, 253, 0.18)');
+        ctx.fillStyle = radGrad;
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      });
+
+      // 4. Peixes e Tartaruga Coloridos Amigáveis do Cenário (Idênticos aos das imagens!)
+      game.ambientCreatures.forEach(ac => drawAmbientMarineCreature(ac));
+
+      // 5. Resíduos Flutuantes em Arte Vetorial Limpa (Garrafa PET Amassada, Sacola, Lata, Pneu, Tambor)
+      game.trashes.forEach(t => drawCleanVectorTrash(t));
+
+      // 6. Vidas Extras (❤️) e Power-ups dentro de Bolhas Esféricas Translúcidas
+      game.supplies.forEach(s => drawCleanVectorSupply(s));
+
+      // 7. Corda e Ponta do Arpão Ecológico
+      const c = game.capi;
+      const hp = game.harpoon;
+      if (hp.state !== 'IDLE') {
+        ctx.save();
+        // Sombra suave da corda na água
+        ctx.strokeStyle = 'rgba(8, 47, 73, 0.35)';
+        ctx.lineWidth = 5;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(c.x, c.y + 2);
+        ctx.lineTo(hp.x, hp.y + 2);
+        ctx.stroke();
+
+        // Corda branca/ciano limpa
+        ctx.strokeStyle = c.turboTimer > 0 ? '#fde047' : '#e0f2fe';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(c.x, c.y);
+        ctx.lineTo(hp.x, hp.y);
+        ctx.stroke();
+
+        // Ponta do Arpão Vetorial Limpa (Sem contorno preto)
+        ctx.translate(hp.x, hp.y);
+        ctx.rotate(hp.angle);
+        ctx.fillStyle = '#bae6fd';
+        ctx.beginPath();
+        ctx.moveTo(18, 0);
+        ctx.lineTo(-9, -10);
+        ctx.lineTo(-4, 0);
+        ctx.lineTo(-9, 10);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = '#0284c7';
+        ctx.beginPath();
+        ctx.moveTo(18, 0);
+        ctx.lineTo(-4, 0);
+        ctx.lineTo(-9, 10);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // 8. Capivara Mergulhadora em Arte Vetorial Limpa (Lineless Shaded 2D)
+      drawCleanVectorCapybara(c);
+
+      // 9. Tentáculos gigantes e redemoinhos do Kraken + Monstros da Poluição
+      game.monsters.forEach(m => {
+        if (m.kind === 'KRAKEN') drawKrakenHazards(m);
+      });
+      game.monsters.forEach(m => drawCleanVectorMonster(m));
+
+      game.projectiles.forEach(p => {
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.angle);
+        ctx.fillStyle = '#fbbf24';
+        ctx.beginPath();
+        ctx.moveTo(11, 0);
+        ctx.lineTo(-7, -6);
+        ctx.lineTo(-7, 6);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      });
+
+      // 10. Ondas Sonar e Textos Flutuantes Limpos
+      game.sonarWaves.forEach(sw => {
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, sw.life / sw.maxLife);
+        ctx.strokeStyle = '#67e8f9';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(sw.x, sw.y, sw.r, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      });
+
+      game.floatTexts.forEach(ft => {
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, ft.life / ft.maxLife);
+        ctx.font = '800 17px "Fredoka", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.shadowColor = 'rgba(3, 45, 75, 0.65)';
+        ctx.shadowBlur = 6;
+        ctx.fillStyle = ft.color;
+        ctx.fillText(ft.text, ft.x, ft.y);
+        ctx.restore();
+      });
+
+      // 11. MIRA RETICULAR BRANCA [ ( • ) ] IDÊNTICA AO CENTRO DAS IMAGENS DE OCEANO!
+      drawHarpoonReticle(mouse.x, mouse.y);
+
+      ctx.restore();
+    }
+
+    // Desenha as Silhuetas Marinhas Azul-Marinho ao Fundo (Tartaruga, Polvo, Cavalo-Marinho, Peixes — Idênticas às imagens!)
+    function drawMarineSilhouette(s) {
+      ctx.save();
+      ctx.translate(s.x, s.y);
+      ctx.scale(s.scale * s.dir, s.scale);
+      ctx.fillStyle = `rgba(18, 63, 116, ${s.alpha})`;
+
+      if (s.kind === 'TURTLE') {
+        // Silhueta de Tartaruga Marinha
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 26, 18, -0.15, 0, Math.PI * 2);
+        ctx.fill();
+        // Cabeça
+        ctx.beginPath();
+        ctx.ellipse(31, -4, 9, 6, -0.2, 0, Math.PI * 2);
+        ctx.fill();
+        // Nadadeiras dianteiras abertas
+        ctx.beginPath();
+        ctx.ellipse(12, -22, 7, 17, 0.55, 0, Math.PI * 2);
+        ctx.ellipse(10, 22, 7, 17, -0.55, 0, Math.PI * 2);
+        ctx.fill();
+        // Nadadeiras traseiras
+        ctx.beginPath();
+        ctx.ellipse(-22, -11, 5, 9, 0.8, 0, Math.PI * 2);
+        ctx.ellipse(-22, 11, 5, 9, -0.8, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (s.kind === 'OCTOPUS') {
+        // Silhueta de Polvo (igual às silhuetas de polvo nas imagens!)
+        ctx.beginPath();
+        ctx.ellipse(0, -12, 14, 18, 0, 0, Math.PI * 2);
+        ctx.fill();
+        for (let t = -2; t <= 2; t++) {
+          ctx.beginPath();
+          ctx.moveTo(t * 5, 2);
+          ctx.quadraticCurveTo(t * 11, 14, t * 14, 24);
+          ctx.quadraticCurveTo(t * 9, 25, t * 3, 6);
+          ctx.fill();
+        }
+      } else if (s.kind === 'SEAHORSE') {
+        // Silhueta de Cavalo-Marinho
+        ctx.beginPath();
+        ctx.arc(0, -14, 7, 0, Math.PI * 2);
+        ctx.fillRect(4, -16, 8, 4);
+        ctx.ellipse(-2, 0, 7, 12, 0.2, 0, Math.PI * 2);
+        ctx.arc(-4, 15, 6, 0, Math.PI * 1.5);
+        ctx.fill();
+      } else if (s.kind === 'ANGELFISH') {
+        // Silhueta de Peixe-Anjo
+        ctx.beginPath();
+        ctx.moveTo(20, 0);
+        ctx.lineTo(-4, -22);
+        ctx.lineTo(-10, -6);
+        ctx.lineTo(-22, -12);
+        ctx.lineTo(-18, 0);
+        ctx.lineTo(-22, 12);
+        ctx.lineTo(-10, 6);
+        ctx.lineTo(-4, 22);
+        ctx.closePath();
+        ctx.fill();
+      } else {
+        // Silhueta de Peixinho
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 12, 7, 0, 0, Math.PI * 2);
+        ctx.moveTo(-10, 0);
+        ctx.lineTo(-19, -7);
+        ctx.lineTo(-19, 7);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    // Desenha os Peixes Coloridos e a Tartaruga Verde Amigáveis do Cenário (Idênticos aos das imagens!)
+    function drawAmbientMarineCreature(ac) {
+      ctx.save();
+      ctx.translate(ac.x, ac.y + Math.sin(ac.phase) * 5);
+      ctx.scale(ac.dir, 1);
+
+      if (ac.kind === 'YELLOW_FISH') {
+        // Peixinho Dourado/Amarelo do topo esquerdo da imagem
+        ctx.fillStyle = '#fcd34d';
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 22, 12, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#fef3c7';
+        ctx.beginPath();
+        ctx.moveTo(-18, 0);
+        ctx.lineTo(-33, -12);
+        ctx.lineTo(-27, 0);
+        ctx.lineTo(-33, 12);
+        ctx.closePath();
+        ctx.fill();
+
+        // Olhinho
+        ctx.fillStyle = '#1e293b';
+        ctx.beginPath();
+        ctx.arc(13, -3, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (ac.kind === 'BLUE_TANG') {
+        // Peixe Azul arredondado com listras azul-escuras ao lado direito da mira na imagem!
+        ctx.fillStyle = '#60a5fa';
+        ctx.beginPath();
+        ctx.moveTo(-16, 0);
+        ctx.lineTo(-32, -16);
+        ctx.lineTo(-28, 0);
+        ctx.lineTo(-32, 16);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = '#2563eb';
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 24, 21, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Listras verticais azul-marinho
+        ctx.fillStyle = '#1e3a8a';
+        ctx.fillRect(-4, -19, 5, 38);
+        ctx.fillRect(7, -16, 4, 32);
+
+        // Olhinho
+        ctx.fillStyle = '#0f172a';
+        ctx.beginPath();
+        ctx.arc(16, -3, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (ac.kind === 'ORANGE_FISH') {
+        // Peixe Laranja da esquerda da imagem
+        ctx.fillStyle = '#fb923c';
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 23, 14, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#fed7aa';
+        ctx.beginPath();
+        ctx.moveTo(-19, 0);
+        ctx.lineTo(-31, -10);
+        ctx.lineTo(-31, 10);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = '#1e293b';
+        ctx.beginPath();
+        ctx.arc(14, -3, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (ac.kind === 'GREEN_TURTLE') {
+        // Tartaruga Verde do topo direito da segunda imagem
+        ctx.fillStyle = '#65a30d';
+        ctx.beginPath();
+        ctx.ellipse(24, -4, 8, 5.5, 0, 0, Math.PI * 2);
+        ctx.ellipse(8, -18, 6, 13, 0.5, 0, Math.PI * 2);
+        ctx.ellipse(8, 18, 6, 13, -0.5, 0, Math.PI * 2);
+        ctx.ellipse(-18, -10, 4, 8, 0.7, 0, Math.PI * 2);
+        ctx.ellipse(-18, 10, 4, 8, -0.7, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#4d7c0f';
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 20, 14, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.restore();
+    }
+
+    // RESÍDUOS EM ARTE VETORIAL LIMPA SEM CONTORNO PRETO (Garrafa PET Amassada idêntica à das imagens!)
+    function drawCleanVectorTrash(t) {
+      ctx.save();
+      ctx.translate(t.x, t.y);
+      ctx.rotate(t.rot);
+
+      if (t.id === 'bottle') {
+        // Garrafa PET Plástica Amassada Translúcida com Tampinha Azul (Idêntica à garrafa nas 2 screenshots!)
+        // Corpo translúcido branco-azulado com dobras de plástico amassado
+        ctx.fillStyle = 'rgba(224, 242, 254, 0.9)';
+        ctx.beginPath();
+        ctx.moveTo(-7, -18);
+        ctx.lineTo(7, -18);
+        ctx.lineTo(14, -8);
+        ctx.lineTo(9, 1);
+        ctx.lineTo(15, 11);
+        ctx.lineTo(10, 21);
+        ctx.lineTo(-10, 21);
+        ctx.lineTo(-14, 12);
+        ctx.lineTo(-8, 2);
+        ctx.lineTo(-14, -8);
+        ctx.closePath();
+        ctx.fill();
+
+        // Facetas de sombra azul-claro do plástico amassado
+        ctx.fillStyle = 'rgba(147, 197, 253, 0.65)';
+        ctx.beginPath();
+        ctx.moveTo(-12, -7);
+        ctx.lineTo(11, -3);
+        ctx.lineTo(7, 3);
+        ctx.lineTo(-8, 1);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.moveTo(-11, 10);
+        ctx.lineTo(12, 7);
+        ctx.lineTo(9, 15);
+        ctx.lineTo(-9, 17);
+        ctx.closePath();
+        ctx.fill();
+
+        // Brilhos brancos puros do plástico
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.ellipse(-3, -11, 5, 2.5, -0.2, 0, Math.PI * 2);
+        ctx.ellipse(2, 5, 6, 2.5, 0.2, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Tampinha Azul no topo da Garrafa PET
+        ctx.fillStyle = '#1d4ed8';
+        ctx.beginPath();
+        ctx.roundRect(-6, -24, 12, 6, 2);
+        ctx.fill();
+      } else if (t.id === 'bag') {
+        // Sacola Plástica Translúcida Flutuante
+        ctx.fillStyle = 'rgba(224, 242, 254, 0.72)';
+        ctx.beginPath();
+        ctx.moveTo(-13, -15);
+        ctx.lineTo(-7, -15);
+        ctx.lineTo(-6, -7);
+        ctx.lineTo(6, -7);
+        ctx.lineTo(7, -15);
+        ctx.lineTo(13, -15);
+        ctx.lineTo(16, 12);
+        ctx.quadraticCurveTo(0, 19, -16, 12);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+        ctx.beginPath();
+        ctx.ellipse(-4, 3, 5, 8, -0.2, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (t.id === 'can') {
+        // Lata de Alumínio Vetorial Limpa
+        ctx.fillStyle = '#ef4444';
+        ctx.beginPath();
+        ctx.roundRect(-10, -14, 20, 28, 4);
+        ctx.fill();
+
+        ctx.fillStyle = '#cbd5e1';
+        ctx.fillRect(-10, -14, 20, 4);
+        ctx.fillRect(-10, 10, 20, 4);
+
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
+        ctx.fillRect(-4, -6, 8, 12);
+      } else if (t.id === 'tire') {
+        // Pneu Submerso Vetorial
+        ctx.fillStyle = '#1e293b';
+        ctx.beginPath();
+        ctx.arc(0, 0, 21, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#334155';
+        ctx.beginPath();
+        ctx.arc(-2, -2, 17, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#0977b0';
+        ctx.beginPath();
+        ctx.arc(0, 0, 9, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (t.id === 'net') {
+        // Rede Fantasma
+        ctx.strokeStyle = 'rgba(163, 230, 53, 0.85)';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.arc(0, 0, 20, 0, Math.PI * 2);
+        ctx.moveTo(-14, -14); ctx.lineTo(14, 14);
+        ctx.moveTo(14, -14); ctx.lineTo(-14, 14);
+        ctx.moveTo(-20, 0); ctx.lineTo(20, 0);
+        ctx.moveTo(0, -20); ctx.lineTo(0, 20);
+        ctx.stroke();
+      } else if (t.id === 'barrel') {
+        // Tambor Poluente Vetorial
+        ctx.fillStyle = '#eab308';
+        ctx.beginPath();
+        ctx.roundRect(-15, -20, 30, 40, 5);
+        ctx.fill();
+
+        ctx.fillStyle = '#ca8a04';
+        ctx.fillRect(-15, -8, 30, 4);
+        ctx.fillRect(-15, 6, 30, 4);
+
+        ctx.fillStyle = '#713f12';
+        ctx.font = '800 13px "Nunito", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('☣️', 0, 0);
+      }
+
+      ctx.restore();
+    }
+
+    function drawCleanVectorSupply(s) {
+      ctx.save();
+      ctx.translate(s.x, s.y);
+
+      // Bolha Esférica Translúcida (igual às bolhas da imagem!) envolvendo a Vida Extra (❤️) ou Power-up
+      const radGrad = ctx.createRadialGradient(-6, -6, 2, 0, 0, s.radius + 4);
+      radGrad.addColorStop(0, 'rgba(255, 255, 255, 0.85)');
+      radGrad.addColorStop(0.65, s.kind === 'HEART' ? 'rgba(254, 205, 211, 0.55)' : (s.kind === 'SONAR' ? 'rgba(103, 232, 249, 0.55)' : 'rgba(254, 240, 138, 0.55)'));
+      radGrad.addColorStop(1, 'rgba(186, 230, 253, 0.25)');
+      ctx.fillStyle = radGrad;
+      ctx.beginPath();
+      ctx.arc(0, 0, s.radius + 4, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.font = '21px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const icon = s.kind === 'HEART' ? '❤️' : (s.kind === 'TURBO' ? '⚡' : (s.kind === 'SONAR' ? '🔊' : '🫧'));
+      ctx.fillText(icon, 0, 1);
+      ctx.restore();
+    }
+
+    // CAPIVARA MERGULHADORA EM ARTE VETORIAL LIMPA (Sem contorno preto pesado, combinando com os peixes da imagem!)
+    function drawCleanVectorCapybara(c) {
+      ctx.save();
+      ctx.translate(c.x, c.y);
+
+      // Setinha branca de direção do arpão ao redor da Capivara
+      ctx.save();
+      ctx.rotate(c.aimAngle);
+      ctx.translate(40, 0);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+      ctx.beginPath();
+      ctx.moveTo(9, 0);
+      ctx.lineTo(-5, -7);
+      ctx.lineTo(-2, 0);
+      ctx.lineTo(-5, 7);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+
+      if (c.invulnTimer > 0 && Math.floor(c.invulnTimer * 12) % 2 === 0) {
+        ctx.globalAlpha = 0.55;
+      }
+
+      if (!c.facingRight) {
+        ctx.scale(-1, 1);
+      }
+
+      const legSwing = Math.sin(c.swimPhase) * 6;
+
+      // Cilindro de Mergulho / Mochila Coletora Amarela-Laranja nas costas
+      ctx.fillStyle = '#f59e0b';
+      ctx.beginPath();
+      ctx.roundRect(-18, -20, 22, 12, 6);
+      ctx.fill();
+      ctx.fillStyle = '#fbbf24';
+      ctx.beginPath();
+      ctx.roundRect(-16, -18, 18, 5, 3);
+      ctx.fill();
+
+      // Nadadeiras / Patinhas
+      ctx.fillStyle = '#78350f';
+      ctx.beginPath();
+      ctx.ellipse(-14, 14 + legSwing * 0.5, 8, 4.2, 0.3, 0, Math.PI * 2);
+      ctx.ellipse(8, 14 - legSwing * 0.5, 8, 4.2, -0.3, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Corpo Vetorial Suave da Capivara
+      ctx.fillStyle = '#b45309';
+      ctx.beginPath();
+      ctx.ellipse(-3, 2, 22, 15, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Sombra suave na barriga
+      ctx.fillStyle = '#92400e';
+      ctx.beginPath();
+      ctx.ellipse(-3, 6, 19, 9, 0, 0, Math.PI);
+      ctx.fill();
+
+      // Cabeça e Focinho da Capivara
+      ctx.fillStyle = '#d97706';
+      ctx.beginPath();
+      ctx.roundRect(4, -14, 23, 20, 9);
+      ctx.fill();
+
+      // Ponta do Focinho
+      ctx.fillStyle = '#92400e';
+      ctx.beginPath();
+      ctx.roundRect(18, -10, 10, 13, 5);
+      ctx.fill();
+
+      // Orelhinha
+      ctx.fillStyle = '#78350f';
+      ctx.beginPath();
+      ctx.arc(8, -14, 4.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Máscara de Mergulho Translúcida Azul-Clara
+      ctx.fillStyle = '#bae6fd';
+      ctx.beginPath();
+      ctx.roundRect(11, -11, 12, 9, 4);
+      ctx.fill();
+
+      ctx.fillStyle = '#0284c7';
+      ctx.beginPath();
+      ctx.roundRect(12.5, -9.5, 9, 6, 3);
+      ctx.fill();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(15, -7.5, 1.8, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+
+      if (c.shieldActive) {
+        ctx.save();
+        const shGrad = ctx.createRadialGradient(c.x - 10, c.y - 10, 4, c.x, c.y, c.radius + 12);
+        shGrad.addColorStop(0, 'rgba(255, 255, 255, 0.55)');
+        shGrad.addColorStop(0.7, 'rgba(186, 230, 253, 0.3)');
+        shGrad.addColorStop(1, 'rgba(125, 211, 252, 0.5)');
+        ctx.fillStyle = shGrad;
+        ctx.beginPath();
+        ctx.arc(c.x, c.y, c.radius + 12, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    // Desenha os tentáculos gigantes emergindo das laterais/fundo e os redemoinhos do Kraken Abissal
+    function drawKrakenHazards(m) {
+      if (m.whirlpoolTimer > 0) {
+        ctx.save();
+        ctx.translate(m.whirlpoolX, m.whirlpoolY);
+        ctx.rotate(m.phase * 2.2);
+        for (let r = 34; r <= 120; r += 28) {
+          ctx.strokeStyle = `rgba(186, 230, 253, ${0.68 - r * 0.0035})`;
+          ctx.lineWidth = 3.5;
+          ctx.setLineDash([24, 16]);
+          ctx.beginPath();
+          ctx.arc(0, 0, r, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      m.tentacles.forEach(tt => {
+        ctx.save();
+        if (tt.state === 'WARN') {
+          ctx.strokeStyle = 'rgba(248, 113, 113, 0.65)';
+          ctx.lineWidth = 18;
+          ctx.lineCap = 'round';
+          ctx.setLineDash([14, 12]);
+          ctx.beginPath();
+          ctx.moveTo(tt.baseX, tt.baseY);
+          ctx.lineTo(tt.baseX + Math.cos(tt.angle) * tt.len, tt.baseY + Math.sin(tt.angle) * tt.len);
+          ctx.stroke();
+        } else {
+          const tipX = tt.baseX + Math.cos(tt.angle) * tt.len * tt.extend;
+          const tipY = tt.baseY + Math.sin(tt.angle) * tt.len * tt.extend;
+          const nx = -Math.sin(tt.angle);
+          const ny = Math.cos(tt.angle);
+          const midX = (tt.baseX + tipX) * 0.5 + nx * Math.sin(m.phase * 2.5) * 18;
+          const midY = (tt.baseY + tipY) * 0.5 + ny * Math.sin(m.phase * 2.5) * 18;
+
+          ctx.strokeStyle = '#312e81';
+          ctx.lineWidth = 28;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(tt.baseX, tt.baseY);
+          ctx.quadraticCurveTo(midX, midY, tipX, tipY);
+          ctx.stroke();
+
+          ctx.strokeStyle = '#4338ca';
+          ctx.lineWidth = 14;
+          ctx.beginPath();
+          ctx.moveTo(tt.baseX, tt.baseY);
+          ctx.quadraticCurveTo(midX, midY, tipX, tipY);
+          ctx.stroke();
+        }
+        ctx.restore();
+      });
+    }
+
+    // MONSTROS DA POLUIÇÃO EM ARTE VETORIAL LIMPA (Sem contorno preto grosso)
+    function drawCleanVectorMonster(m) {
+      ctx.save();
+      ctx.translate(m.x, m.y);
+
+      if (m.hitFlash > 0) {
+        ctx.filter = 'brightness(1.6)';
+      }
+
+      if (m.kind === 'JELLY') {
+        // Medusa-Tóxica Vetorial
+        ctx.fillStyle = 'rgba(167, 139, 250, 0.88)';
+        ctx.beginPath();
+        ctx.arc(0, -2, 18, Math.PI, 0);
+        ctx.lineTo(18, 9);
+        ctx.lineTo(9, 4);
+        ctx.lineTo(0, 12);
+        ctx.lineTo(-9, 4);
+        ctx.lineTo(-18, 9);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = '#ddd6fe';
+        ctx.beginPath();
+        ctx.ellipse(0, -9, 10, 5, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#1e1b4b';
+        ctx.beginPath();
+        ctx.arc(-6, -3, 2.5, 0, Math.PI * 2);
+        ctx.arc(6, -3, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (m.kind === 'PUFFER') {
+        // Baiacu-Espinhoso Vetorial
+        const sc = m.puffedTimer > 0 ? 1.24 : 1.0;
+        ctx.scale(sc, sc);
+
+        ctx.fillStyle = '#f59e0b';
+        for (let i = 0; i < 8; i++) {
+          const a = (i * Math.PI) / 4 + m.phase * 0.2;
+          ctx.beginPath();
+          ctx.moveTo(Math.cos(a) * 33, Math.sin(a) * 33);
+          ctx.lineTo(Math.cos(a - 0.24) * 22, Math.sin(a - 0.24) * 22);
+          ctx.lineTo(Math.cos(a + 0.24) * 22, Math.sin(a + 0.24) * 22);
+          ctx.closePath();
+          ctx.fill();
+        }
+
+        ctx.fillStyle = '#fbbf24';
+        ctx.beginPath();
+        ctx.arc(0, 0, 24, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#fde68a';
+        ctx.beginPath();
+        ctx.arc(0, 6, 17, 0, Math.PI);
+        ctx.fill();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(-8, -4, 4.8, 0, Math.PI * 2);
+        ctx.arc(8, -4, 4.8, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#0f172a';
+        ctx.beginPath();
+        ctx.arc(-8, -4, 2.2, 0, Math.PI * 2);
+        ctx.arc(8, -4, 2.2, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (m.kind === 'CRAB') {
+        // Caranguejo-Sucata Vetorial
+        ctx.fillStyle = '#ef4444';
+        ctx.beginPath();
+        ctx.ellipse(0, 2, 19, 13, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#f97316';
+        ctx.beginPath();
+        ctx.arc(-17, -9, 7.5, 0.3, Math.PI * 1.7);
+        ctx.arc(17, -9, 7.5, -0.5, Math.PI * 1.2);
+        ctx.fill();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(-6, -2, 3.2, 0, Math.PI * 2);
+        ctx.arc(6, -2, 3.2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#0f172a';
+        ctx.beginPath();
+        ctx.arc(-6, -2, 1.6, 0, Math.PI * 2);
+        ctx.arc(6, -2, 1.6, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (m.kind === 'EEL') {
+        if (m.state === 'AIMING') {
+          ctx.save();
+          ctx.strokeStyle = 'rgba(254, 202, 202, 0.75)';
+          ctx.lineWidth = 2;
+          ctx.setLineDash([7, 5]);
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.lineTo(Math.cos(m.dashAngle) * 300, Math.sin(m.dashAngle) * 300);
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        ctx.rotate(m.state === 'PATROL' ? (m.vx >= 0 ? 0 : Math.PI) : m.dashAngle);
+        ctx.fillStyle = '#1e3a8a';
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 26, 10, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#f87171';
+        ctx.beginPath();
+        ctx.arc(14, -3, 3.2, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (m.kind === 'KRAKEN') {
+        // 6 Tentáculos ondulantes de detritos
+        ctx.fillStyle = '#312e81';
+        for (let t = -2.5; t <= 2.5; t += 1) {
+          const sway = Math.sin(m.phase + t * 1.1) * 9;
+          ctx.beginPath();
+          ctx.moveTo(t * 11, 12);
+          ctx.quadraticCurveTo(t * 15 + sway, 34, t * 18 + sway * 1.3, 52);
+          ctx.quadraticCurveTo(t * 11 + sway, 46, t * 6, 16);
+          ctx.closePath();
+          ctx.fill();
+        }
+
+        // Cabeça/Manto colossal do Kraken
+        ctx.fillStyle = '#4338ca';
+        ctx.beginPath();
+        ctx.ellipse(0, -6, 36, 32, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Detritos grudados (rede verde e mancha de sucata)
+        ctx.fillStyle = '#65a30d';
+        ctx.beginPath();
+        ctx.ellipse(-16, -18, 11, 6, -0.4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#1e293b';
+        ctx.beginPath();
+        ctx.arc(17, -14, 7, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Olhos vermelhos brilhantes
+        ctx.fillStyle = '#f87171';
+        ctx.beginPath();
+        ctx.arc(-11, -2, 5, 0, Math.PI * 2);
+        ctx.arc(11, -2, 5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#fef08a';
+        ctx.beginPath();
+        ctx.arc(-11, -2, 2.2, 0, Math.PI * 2);
+        ctx.arc(11, -2, 2.2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      if (m.stunTimer > 0) {
+        ctx.font = '15px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('💫', 0, -m.radius - 15);
+      }
+
+      // Barra de HP limpa com borda branca
+      if (m.maxHp > 1) {
+        const bw = 36;
+        const bh = 6;
+        const by = -m.radius - 13;
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+        ctx.beginPath();
+        ctx.roundRect(-bw / 2 - 1.5, by - 1.5, bw + 3, bh + 3, 4);
+        ctx.fill();
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.55)';
+        ctx.fillRect(-bw / 2, by, bw, bh);
+        ctx.fillStyle = '#34d399';
+        ctx.fillRect(-bw / 2, by, (Math.max(0, m.hp) / m.maxHp) * bw, bh);
+      }
+
+      ctx.restore();
+    }
+
+    // MIRA RETICULAR BRANCA [ ( • ) ] IDÊNTICA AO CENTRO DAS 2 SCREENSHOTS DE OCEANO!
+    function drawHarpoonReticle(rx, ry) {
+      ctx.save();
+      ctx.translate(rx, ry);
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+      ctx.lineWidth = 2;
+
+      // Mira simples do arpão (círculo fino + ponto central), sem enquadramento de câmera
+      ctx.beginPath();
+      ctx.arc(0, 0, 11, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(0, 0, 3.2, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    /**************************************************************
+     * 8. MODAIS, HUD SUPERIOR E TELA CHEIA
+     **************************************************************/
+    function updateTopHUD() {
+      document.getElementById('hudScore').textContent = `${game.score} PTS`;
+      document.getElementById('hudHighScore').textContent = `${game.highScore}`;
+      document.getElementById('hudTrash').textContent = `${game.trashCollected} lixos`;
+
+      let heartsStr = '';
+      for (let i = 0; i < game.capi.maxLives; i++) {
+        heartsStr += i < game.capi.lives ? '❤️' : '🤍';
+      }
+      document.getElementById('hudHearts').textContent = heartsStr;
+
+      const lvlEl = document.getElementById('hudDangerLevel');
+      const names = {
+        1: '🌊 Nível 1: Águas Calmas',
+        2: '🐠 Nível 2: Correnteza Suja',
+        3: '⚠️ Nível 3: Maré Poluída',
+        4: '🌩️ Nível 4: Zona de Tempestade',
+        5: '🔱 Nível 5: Profundezas Abissais'
+      };
+      lvlEl.textContent = names[game.dangerLevel] || names[5];
+    }
+
+    function openHelpModal() {
+      game.paused = true;
+      document.getElementById('helpModal').classList.add('active');
+    }
+
+    function closeHelpModal() {
+      ensureAudio();
+      document.getElementById('helpModal').classList.remove('active');
+      game.paused = false;
+    }
+
+    function toggleDebugDrawer() {
+      document.getElementById('debugDrawer').classList.toggle('active');
+    }
+
+    function triggerGameOver() {
+      game.running = false;
+      document.getElementById('gameOverStats').innerHTML = `
+        <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:2px dashed #bae6fd; font-weight:800;">
+          <span>🏆 Pontuação Final:</span>
+          <strong style="color:#0284c7; font-size:1.05rem;">${game.score} PTS</strong>
+        </div>
+        <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:2px dashed #bae6fd; font-weight:800;">
+          <span>⭐ Seu Recorde (High Score):</span>
+          <strong style="color:#d97706;">${game.highScore} PTS</strong>
+        </div>
+        <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:2px dashed #bae6fd; font-weight:800;">
+          <span>♻️ Total de Lixos Retirados do Mar:</span>
+          <strong>${game.trashCollected} itens</strong>
+        </div>
+        <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:2px dashed #bae6fd; font-weight:800;">
+          <span>⚔️ Monstros da Poluição Derrotados:</span>
+          <strong style="color:#7c3aed;">${game.monstersDefeated} monstros</strong>
+        </div>
+        <div style="display:flex; justify-content:space-between; padding:6px 0; font-weight:800;">
+          <span>🌊 Nível Máximo de Profundidade:</span>
+          <strong>Nível ${game.dangerLevel}</strong>
+        </div>
+      `;
+      document.getElementById('gameOverModal').classList.add('active');
+    }
+
+    function restartGame() {
+      document.getElementById('gameOverModal').classList.remove('active');
+      document.getElementById('debugDrawer').classList.remove('active');
+      game.score = 0;
+      game.trashCollected = 0;
+      game.monstersDefeated = 0;
+      game.dangerLevel = 1;
+      game.waveMeter = 0;
+      resetDockSlots();
+      game.capi.x = W * 0.34;
+      game.capi.y = H * 0.48;
+      game.capi.vx = 0;
+      game.capi.vy = 0;
+      game.capi.lives = 3;
+      game.capi.invulnTimer = 1.0;
+      game.capi.shieldActive = false;
+      game.capi.turboTimer = 0;
+      game.harpoon.state = 'IDLE';
+      game.harpoon.hookedTrash = [];
+      game.harpoon.hookedSupplies = [];
+      game.trashes = [];
+      game.supplies = [];
+      game.monsters = [];
+      game.projectiles = [];
+      game.floatTexts = [];
+      game.sonarWaves = [];
+
+      for (let i = 0; i < 5; i++) spawnTrashItem();
+      spawnMonster('JELLY');
+      spawnMonster('PUFFER');
+      updateTopHUD();
+      game.running = true;
+      game.paused = false;
+    }
+
+    function toggleFullScreen() {
+      const docEl = document.documentElement;
+      if (!document.fullscreenElement) {
+        if (docEl.requestFullscreen) docEl.requestFullscreen().catch(() => { });
+      } else {
+        if (document.exitFullscreen) document.exitFullscreen().catch(() => { });
+      }
+    }
+
+    // Popula o oceano inicial
+    for (let i = 0; i < 5; i++) spawnTrashItem();
+    spawnMonster('JELLY');
+    spawnMonster('PUFFER');
+    updateTopHUD();
+
+    let lastFrame = performance.now();
+    function loop(now) {
+      const dt = Math.min(0.05, (now - lastFrame) / 1000);
+      lastFrame = now;
+      updateGame(dt);
+      drawGame();
+      requestAnimationFrame(loop);
+    }
+    requestAnimationFrame(loop);
+  </script>
+</body>
+
+</html>
