@@ -646,8 +646,8 @@
             <span>DASH</span>
           </div>
         </button>
-        <button class="action-circle-btn" id="harpoonStickBtn" title="Arraste para mirar e solte para disparar o Arpão">
-          <div class="action-circle-inner" id="harpoonStickKnob" style="transition: transform 0.1s ease-out;">
+        <button class="action-circle-btn" id="harpoonBtn" title="Disparar / Recolher Arpão com Corda">
+          <div class="action-circle-inner">
             <span style="font-size:1.55rem; color:#4b5563;">⚓</span>
             <span>ARPÃO</span>
           </div>
@@ -952,12 +952,9 @@
     const joy = { active: false, x: 0, y: 0, pointerId: null, touchId: null };
     const joyBase = document.getElementById('joyBase');
     const joyKnob = document.getElementById('joyKnob');
-    let aimMode = 'MOUSE'; // 'MOUSE' | 'SWIM' | 'STICK'
+    let aimMode = 'MOUSE'; // 'MOUSE' | 'SWIM'
 
-    /* BOTÃO-ALAVANCA DO ARPÃO (TWIN-STICK MOBILE): arraste para mirar em 360° e solte para disparar */
-    const aimJoy = { active: false, pointerId: null, touchId: null, dragged: false };
-    const harpoonBtn = document.getElementById('harpoonStickBtn');
-    const harpoonKnob = document.getElementById('harpoonStickKnob');
+    const harpoonBtn = document.getElementById('harpoonBtn');
     const dashBtn = document.getElementById('dashBtn');
 
     function findTouchById(touchList, id) {
@@ -967,93 +964,20 @@
       return null;
     }
 
-    function updateAimStickPos(clientX, clientY) {
-      const rect = harpoonBtn.getBoundingClientRect();
-      const cx = rect.left + rect.width / 2;
-      const cy = rect.top + rect.height / 2;
-      const maxR = rect.width * 0.32;
-      let dx = clientX - cx;
-      let dy = clientY - cy;
-      const dist = Math.hypot(dx, dy);
-      if (dist > maxR) { dx = dx / dist * maxR; dy = dy / dist * maxR; }
-      harpoonKnob.style.transform = `translate(${dx}px, ${dy}px)`;
-      if (dist > 7) {
-        aimJoy.dragged = true;
-        aimMode = 'STICK';
-        const ang = Math.atan2(dy, dx);
-        game.capi.aimAngle = ang;
-        game.capi.facingRight = Math.cos(ang) >= 0;
-        mouse.x = Math.max(0, Math.min(WORLD_W, game.capi.x + Math.cos(ang) * 145));
-        mouse.y = Math.max(0, Math.min(WORLD_H, game.capi.y + Math.sin(ang) * 145));
-      }
-    }
-
-    function releaseAimStick(shouldFire) {
-      if (!aimJoy.active) return;
-      aimJoy.active = false;
-      aimJoy.pointerId = null;
-      aimJoy.touchId = null;
-      harpoonKnob.style.transition = 'transform 0.1s ease-out';
-      harpoonKnob.style.transform = 'translate(0px, 0px)';
-      if (shouldFire) fireOrReleaseHarpoon();
-      if (aimMode === 'STICK') aimMode = 'SWIM';
-    }
-
+    // Botão do Arpão simples (apenas dispara/recolhe, com suporte a multi-toque e mouse)
     harpoonBtn.style.touchAction = 'none';
     harpoonBtn.addEventListener('touchstart', ev => {
       ev.preventDefault();
       ev.stopPropagation();
       ensureAudio();
-      if (aimJoy.touchId === null && ev.changedTouches.length > 0) {
-        const t = ev.changedTouches[0];
-        aimJoy.active = true;
-        aimJoy.dragged = false;
-        aimJoy.touchId = t.identifier;
-        harpoonKnob.style.transition = 'none';
-        updateAimStickPos(t.clientX, t.clientY);
-      }
+      fireOrReleaseHarpoon();
     }, { passive: false });
-    harpoonBtn.addEventListener('touchmove', ev => {
-      if (!aimJoy.active || aimJoy.touchId === null) return;
-      const t = findTouchById(ev.changedTouches, aimJoy.touchId) || findTouchById(ev.touches, aimJoy.touchId);
-      if (t) { ev.preventDefault(); updateAimStickPos(t.clientX, t.clientY); }
-    }, { passive: false });
-    harpoonBtn.addEventListener('touchend', ev => {
-      if (aimJoy.touchId !== null && findTouchById(ev.changedTouches, aimJoy.touchId)) {
-        ev.preventDefault();
-        releaseAimStick(true);
-      }
-    }, { passive: false });
-    harpoonBtn.addEventListener('touchcancel', ev => {
-      if (aimJoy.touchId !== null && findTouchById(ev.changedTouches, aimJoy.touchId)) {
-        releaseAimStick(false);
-      }
-    });
-
     harpoonBtn.addEventListener('pointerdown', ev => {
       if (ev.pointerType === 'touch') return;
       ev.preventDefault();
       ev.stopPropagation();
       ensureAudio();
-      aimJoy.active = true;
-      aimJoy.dragged = false;
-      aimJoy.pointerId = ev.pointerId;
-      harpoonBtn.setPointerCapture(ev.pointerId);
-      harpoonKnob.style.transition = 'none';
-      updateAimStickPos(ev.clientX, ev.clientY);
-    });
-    harpoonBtn.addEventListener('pointermove', ev => {
-      if (ev.pointerType !== 'touch' && aimJoy.active && ev.pointerId === aimJoy.pointerId) {
-        updateAimStickPos(ev.clientX, ev.clientY);
-      }
-    });
-    harpoonBtn.addEventListener('pointerup', ev => {
-      if (ev.pointerType !== 'touch' && ev.pointerId === aimJoy.pointerId) releaseAimStick(true);
-    });
-    ['pointercancel', 'lostpointercapture'].forEach(type => {
-      harpoonBtn.addEventListener(type, ev => {
-        if (ev.pointerType !== 'touch' && ev.pointerId === aimJoy.pointerId) releaseAimStick(false);
-      });
+      fireOrReleaseHarpoon();
     });
 
     // Botão Dash com suporte imediato a multi-toque e mouse
@@ -2243,18 +2167,7 @@
         ctx.restore();
       });
 
-      // 11. Mira do Arpão (e linha de mira ao arrastar o botão no mobile)
-      if (aimJoy.active && c) {
-        ctx.save();
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([8, 6]);
-        ctx.beginPath();
-        ctx.moveTo(c.x, c.y);
-        ctx.lineTo(c.x + Math.cos(c.aimAngle) * 320, c.y + Math.sin(c.aimAngle) * 320);
-        ctx.stroke();
-        ctx.restore();
-      }
+      // 11. Mira do Arpão
       drawHarpoonReticle(mouse.x, mouse.y);
 
       ctx.restore();
