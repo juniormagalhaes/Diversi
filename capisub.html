@@ -1812,66 +1812,58 @@
             }
           }
         } else if (m.kind === 'KRAKEN') {
-          // Entra pela base da tela e patrulha
-          if (m.y > m.targetY) {
+          // Entra na arena e orbita/patrulha continuamente ao redor da área da capivara sem travar em limiares
+          if (m.y > m.targetY + 80 && m.y > cam.y + H - 40) {
             m.y += (m.targetY - m.y) * Math.min(1, dt * 2.5);
           } else {
-            m.x += m.vx * dt;
-            m.y += Math.sin(m.phase * 0.5) * 22 * dt;
-            if (m.x < 140) m.vx = Math.abs(m.vx);
-            if (m.x > WORLD_W - 140) m.vx = -Math.abs(m.vx);
+            const dxC = c.x - m.x;
+            const dyC = c.y - m.y;
+            const distC = Math.max(1, Math.hypot(dxC, dyC));
+            const ux = dxC / distC;
+            const uy = dyC / distC;
+            // Direção tangencial (orbita) + aproximação suave quando longe
+            const orbitDir = m.vx >= 0 ? 1 : -1;
+            const radialPull = distC > 260 ? 68 : (distC < 120 ? -35 : 10);
+            const tangSpeed = 58 * orbitDir;
+            m.x += (ux * radialPull - uy * tangSpeed) * dt;
+            m.y += (uy * radialPull + ux * tangSpeed + Math.sin(m.phase * 0.6) * 18) * dt;
+            m.x = Math.max(80, Math.min(WORLD_W - 80, m.x));
+            m.y = Math.max(90, Math.min(WORLD_H - 90, m.y));
           }
 
-          // 1. Tentáculos gigantes emergem das laterais ou do fundo da tela visível tentando varrer a área da capivara
+          // 1. Tentáculos gigantes saem diretamente do corpo do Kraken (m.x, m.y) e varrem em arco na direção da capivara
           m.tentacleCooldown -= dt;
           if (m.tentacleCooldown <= 0 && m.tentacles.length < 2) {
-            m.tentacleCooldown = 2.1;
-            const edges = ['LEFT', 'RIGHT', 'BOTTOM'];
-            const edge = edges[Math.floor(Math.random() * edges.length)];
-            let baseX, baseY, sweepA0, sweepA1, len;
-            if (edge === 'LEFT') {
-              baseX = cam.x - 15;
-              baseY = Math.max(cam.y + 90, Math.min(cam.y + H - 100, c.y + (Math.random() - 0.5) * 80));
-              const aim = Math.atan2(c.y - baseY, c.x - baseX);
-              sweepA0 = aim - 0.42;
-              sweepA1 = aim + 0.42;
-              len = 360 + Math.random() * 120;
-            } else if (edge === 'RIGHT') {
-              baseX = cam.x + W + 15;
-              baseY = Math.max(cam.y + 90, Math.min(cam.y + H - 100, c.y + (Math.random() - 0.5) * 80));
-              const aim = Math.atan2(c.y - baseY, c.x - baseX);
-              sweepA0 = aim - 0.42;
-              sweepA1 = aim + 0.42;
-              len = 360 + Math.random() * 120;
-            } else {
-              baseX = Math.max(cam.x + 120, Math.min(cam.x + W - 120, c.x + (Math.random() - 0.5) * 100));
-              baseY = cam.y + H + 15;
-              const aim = Math.atan2(c.y - baseY, c.x - baseX);
-              sweepA0 = aim - 0.45;
-              sweepA1 = aim + 0.45;
-              len = 320 + Math.random() * 110;
-            }
+            m.tentacleCooldown = 2.0;
+            const aim = Math.atan2(c.y - m.y, c.x - m.x);
+            let sweepA0 = aim - 0.52;
+            let sweepA1 = aim + 0.52;
+            const len = 300 + Math.random() * 70;
             if (Math.random() < 0.5) { const tmp = sweepA0; sweepA0 = sweepA1; sweepA1 = tmp; }
             m.tentacles.push({
-              baseX, baseY, len,
+              baseX: m.x,
+              baseY: m.y,
+              len,
               angle: sweepA0,
               sweepA0, sweepA1,
               state: 'WARN', // 'WARN' -> 'SWEEP' -> 'RETRACT'
-              timer: 0.95,
+              timer: 0.9,
               extend: 0
             });
           }
 
           for (let ti = m.tentacles.length - 1; ti >= 0; ti--) {
             const tt = m.tentacles[ti];
+            tt.baseX = m.x;
+            tt.baseY = m.y;
             tt.timer -= dt;
             if (tt.state === 'WARN') {
               if (tt.timer <= 0) {
                 tt.state = 'SWEEP';
-                tt.timer = 1.6;
+                tt.timer = 1.5;
               }
             } else if (tt.state === 'SWEEP') {
-              const p = Math.max(0, Math.min(1, 1 - tt.timer / 1.6));
+              const p = Math.max(0, Math.min(1, 1 - tt.timer / 1.5));
               tt.extend = Math.min(1, p * 3.5);
               tt.angle = tt.sweepA0 + (tt.sweepA1 - tt.sweepA0) * p;
               const tipX = tt.baseX + Math.cos(tt.angle) * tt.len * tt.extend;
@@ -1889,7 +1881,7 @@
             }
           }
 
-          // 2. Redemoinhos que puxam o jogador E espalham os lixos pela tela
+          // 2. Redemoinho gerado na área de natação (puxando a capivara e espalhando os lixos)
           if (m.whirlpoolTimer > 0) {
             m.whirlpoolTimer -= dt;
             const wx = m.whirlpoolX;
@@ -1920,8 +1912,8 @@
             if (m.whirlpoolCooldown <= 0) {
               m.whirlpoolCooldown = 4.6;
               m.whirlpoolTimer = 2.6;
-              m.whirlpoolX = Math.max(180, Math.min(WORLD_W - 180, c.x + (Math.random() - 0.5) * 180));
-              m.whirlpoolY = Math.max(140, Math.min(WORLD_H - 160, c.y + (Math.random() - 0.5) * 120));
+              m.whirlpoolX = Math.max(180, Math.min(WORLD_W - 180, c.x + (Math.random() - 0.5) * 200));
+              m.whirlpoolY = Math.max(140, Math.min(WORLD_H - 160, c.y + (Math.random() - 0.5) * 140));
             }
           }
         }
@@ -2619,10 +2611,10 @@
       m.tentacles.forEach(tt => {
         ctx.save();
         if (tt.state === 'WARN') {
-          ctx.strokeStyle = 'rgba(248, 113, 113, 0.65)';
-          ctx.lineWidth = 18;
-          ctx.lineCap = 'round';
-          ctx.setLineDash([14, 12]);
+          ctx.strokeStyle = 'rgba(248, 113, 113, 0.72)';
+          ctx.lineWidth = 4;
+          ctx.lineCap = 'butt';
+          ctx.setLineDash([12, 10]);
           ctx.beginPath();
           ctx.moveTo(tt.baseX, tt.baseY);
           ctx.lineTo(tt.baseX + Math.cos(tt.angle) * tt.len, tt.baseY + Math.sin(tt.angle) * tt.len);
